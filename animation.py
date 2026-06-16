@@ -2,6 +2,10 @@ from ursina import *
 import random
 import threading
 import time
+from groq import Groq
+
+CHIAVE_API = os.getenv("GROQ_API_KEY", "your_api_key")
+client_llm = Groq(api_key=CHIAVE_API)
 
 app = Ursina(title="Mappa Personalizzabile")
 
@@ -25,13 +29,40 @@ turni_trascorsi = 0
 vittime_nascoste = []  # Dispersi posizionati nel setup, ma non ancora visibili
 vittime_attive = []    # Dispersi comparsi sulla mappa (colore rosso)
 vittime_scoperte = []  # Dispersi trovati dal drone (in attesa di LLM o con Timer attivo)
+# Nuove variabili globali
+mosse_drone_parziali = 0
+rover_in_movimento = False # Diventerà True quando implementerete l'A* del rover
+
+def avanza_tempo_globale():
+    """Questa funzione fa scorrere un turno di vita per tutti i dispersi."""
+    for cell in dispersi:
+        if not cell.morto:
+            cell.ttl -= 1
+            
+            # Se la cella è già stata scoperta dal drone, aggiorniamo il testo a schermo
+            if cell.scoperto and cell.text_entity:
+                cell.text = str(cell.ttl)
+                
+            # Condizione di morte
+            if cell.ttl <= 0:
+                cell.morto = True
+                if cell.scoperto:
+                    # Se era già stato scoperto, diventa nero a schermo
+                    cell.color = color.black
+                    cell.text = "X"
+                    cell.text_color = color.red
+                    print(f"[TRAGEDIA] Il soggetto in ({cell.grid_x}, {cell.grid_y}) è deceduto prima dei soccorsi.")
+                else:
+                    # Se muore prima che il drone lo trovi, non succede nulla graficamente, 
+                    # ma quando il drone passerà, troverà un cadavere invece di un ferito.
+                    print(f"[SISTEMA] Segnale vitale perso da una posizione sconosciuta...")
+
 
 # ==========================================
 # Variabili per gli Agenti
 # ==========================================
 drone = None
 rover = None
-pyramid = Cone(resolution=4)
 # ==========================================
 # Modulo Simulazione 3D
 # ==========================================
@@ -71,7 +102,6 @@ def avvia_simulazione_3d():
         elif cell.is_disperso:
             # Nascondiamo i dispersi facendoli sembrare erba normale
             cell.color = color.hex('#7CFC00')
-            cell.ttl = None  # Time To Live (Turni prima della "morte")
             vittime_nascoste.append(cell)
         else:
             cell.color = color.hex('#7CFC00')
@@ -129,31 +159,16 @@ def spawna_vittime(quantita=2):
             nuova_vittima.color = color.red
             print(f"[SISTEMA] Nuova emergenza rilevata in ({nuova_vittima.grid_x}, {nuova_vittima.grid_y})!")
 
-def aggiorna_timer_vittime():
-    """Scala il TTL (Time To Live) delle vittime scoperte ad ogni turno."""
-    for vittima in vittime_scoperte:
-        if vittima.ttl is not None and vittima.ttl > 0:
-            vittima.ttl -= 1
-            # Aggiorna il testo sulla cella per far vedere il countdown
-            if vittima.text_entity:
-                vittima.text_entity.enable()
-                vittima.text = str(vittima.ttl)
-                vittima.text_color = color.white
-            
-            if vittima.ttl <= 0:
-                print(f"[CRITICO] Il soggetto in ({vittima.grid_x}, {vittima.grid_y}) non ce l'ha fatta.")
-                vittima.color = color.black
-                vittima.text = "X"
-                vittima.text_color = color.red
 
 def muovi_drone_random():
+    global mosse_drone_parziali, turni_trascorsi
     """Muove il drone di una cella adiacente in modo casuale, ignorando gli ostacoli."""
     if not drone: return
     
-    mosse_possibili = [(0, 1), (0, -1), (1, 0), (-1, 0)]
+    mosse_possibili = [(0, 2), (0, -2), (2, 0), (-2, 0)]
     dx, dy = random.choice(mosse_possibili)
     
-    nuovo_x, nuovo_y= drone.grid_x + dx, drone.grid_y + dy
+    nuovo_x, nuovo_y = drone.grid_x + dx, drone.grid_y + dy
     
     # Verifica che il drone non esca dai confini della mappa
     if 0 <= nuovo_x < map_w and 0 <= nuovo_y < map_h:
@@ -162,24 +177,30 @@ def muovi_drone_random():
         
         offset_x, offset_y = (map_w - 1) / 2, (map_h - 1) / 2
         
-        
         # Ursina anima il passaggio da A a B fluidamente
         drone.animate_position((nuovo_x - offset_x, nuovo_y - offset_y, -2.5), duration=0.3, curve=curve.linear)
         
-        turni_trascorsi +=1
+        # --- 1. GESTIONE SPAWN ---
+        # Ogni movimento del drone conta come un "turno" per l'apparizione di nuovi feriti
+        turni_trascorsi += 1
 
-        if turni_trascorsi ==1:
+        if turni_trascorsi == 1:
             spawna_vittime(2)
-
         elif turni_trascorsi % 7 == 0:
             spawna_vittime(1)
-        
-        aggiorna_timer_vittime()
 
+        # --- 2. GESTIONE SCORRIMENTO DEL TEMPO VITA (TTL) ---
+        # 3 mosse del drone = -1 vita a tutti i dispersi
+        if not rover_in_movimento:
+            mosse_drone_parziali += 1
+            if mosse_drone_parziali >= 4:
+                mosse_drone_parziali = 0
+                avanza_tempo_globale() # Abbassa il TTL e controlla se qualcuno muore
+                
         # Dopo lo spostamento, il drone scansiona il terreno sotto di lui
         controlla_visione_drone()
         
-    # Richiama se stessa dopo 0.5 secondi creando un loop infinito senza bloccare il gioco
+    # Richiama se stessa dopo 0.5 secondi creando un loop infinito
     invoke(muovi_drone_random, delay=0.5)
 
 def controlla_visione_drone():
@@ -189,26 +210,70 @@ def controlla_visione_drone():
             check_x = drone.grid_x + dx
             check_y = drone.grid_y + dy
             
-            # Cerca nel database dei dispersi
+            # Cerca nel database dei dispersi ATTIVI (quelli rossi sulla mappa)
             for disp in vittime_attive:
-                # Se la cella coincide e non è stata già "scoperta" (evita spam)
                 if disp.grid_x == check_x and disp.grid_y == check_y:
-
+                    
+                    # Rimuove il disperso dalle emergenze e lo segna come scoperto
                     vittime_attive.remove(disp)
                     vittime_scoperte.append(disp)
-
-                    descrizione = descrizione_dispersi[(check_x, check_y)]
-                    print(f"\n[DRONE] Avvistato soggetto in ({check_x}, {check_y})!")
-                    disp.color = color.magenta
-
-                    thread = threading.Thread(target=chiama_llm_asincrono, args=(disp, descrizione))
-                    thread.start()
-
+                    disp.scoperto = True
                     
-                    # --------------------------------------------------------
-                    # QUI IN FUTURO INSERIREMO IL THREAD PER LA CHIAMATA LLM
-                    # --------------------------------------------------------
+                    # Se il tempo globale lo ha già ucciso prima che il drone arrivasse
+                    if disp.morto:
+                        disp.color = color.black
+                        disp.text = "X"
+                        disp.text_color = color.red
+                        print(f"\n[DRONE] Avvistato cadavere in ({check_x}, {check_y}). Troppo tardi.")
+                    else:
+                        # È vivo! Iniziamo il triage radio
+                        disp.color = color.magenta
+                        disp.text = str(disp.ttl) # Mostriamo la vita reale rimanente
+                        disp.text_color = color.white
+                        
+                        print(f"\n[DRONE] Avvistato soggetto VIVO in ({check_x}, {check_y})!")
+                        
+                        # Avviamo il thread dell'LLM (ora si chiama chiama_llm_triage)
+                        thread = threading.Thread(target=chiama_llm_triage, args=(disp, disp.descrizione))
+                        thread.start()
 
+
+def chiama_llm_triage(cella_vittima, descrizione_visiva):
+    """
+    Usa Llama 3 (via Groq) per generare un report di urgenza in linguaggio naturale.
+    """
+    print(f"\n[LLM] Connessione a Groq... Generazione dispaccio per la situazione: '{descrizione_visiva}'")
+    
+    prompt_drone = f"""
+    Sei l'IA visiva a bordo di un drone di ricognizione. 
+    Hai appena scansionato un sopravvissuto. La sua descrizione visiva è: "{descrizione_visiva}".
+    
+    Il tuo compito è inviare un singolo, breve messaggio radio (massimo 2 frasi) all'IA del Rover di recupero.
+    Il messaggio deve far capire la priorità medica (alta, media o bassa) e l'urgenza di intervento 
+    basandosi ESCLUSIVAMENTE sulle ferite descritte. Non menzionare coordinate o numeri temporali.
+    """
+
+    try:
+        # Non forziamo il formato JSON. Vogliamo solo puro testo!
+        risposta = client_llm.chat.completions.create(
+            messages=[{"role": "user", "content": prompt_drone}],
+            model="llama-3.1-8b-instant"
+        )
+        
+        messaggio_radio = risposta.choices[0].message.content.strip()
+        
+        print(f"\n📡 [DISPACCIO DRONE-TO-ROVER] Da coord({cella_vittima.grid_x}, {cella_vittima.grid_y}):\n"
+              f"«{messaggio_radio}»")
+              
+        # ==========================================
+        # ZONA DI COLLEGAMENTO CON IL ROVER
+        # ==========================================
+        # Quando il tuo compagno avrà pronto il suo LLM, potrete richiamare 
+        # la sua funzione proprio qui, passando la stringa "messaggio_radio".
+        # Esempio: aggiorna_priorita_rover(cella_vittima, messaggio_radio)
+        
+    except Exception as e:
+        print(f"[ERRORE RADIO] Comunicazione fallita: {e}")
 
 # ==========================================
 # Funzioni Interattive delle Celle
@@ -344,7 +409,7 @@ def inserimento_descrizioni():
     mostra_ui_descrizione()
 
 def mostra_ui_descrizione():
-    global panel_description, input_description
+    global panel_description, input_description, input_ttl
 
     if panel_description:
         destroy(panel_description)
@@ -358,12 +423,16 @@ def mostra_ui_descrizione():
     cell.color = color.yellow
 
     input_description = InputField(default_value=f"Soggetto {disperso_corrente_idx+1}")
+    input_ttl = InputField(default_value="30", character_limit=3)
 
     panel_description = WindowPanel(
         title=f'Disperso {disperso_corrente_idx+1}/{len(dispersi)} a ({cell.grid_x}, {cell.grid_y})',
         content=(
             Text(text='Inserisci la descrizione:  \n inserire la situazione del disperso, se ferito o meno'),
             input_description,
+            Space(height=1),
+            Text(text='Turni di vita stimati (Reali):'),
+            input_ttl,
             Space(height=1),
             Button(text='Salva', color=color.green, on_click=salva_descrizione)
         ),
@@ -422,6 +491,18 @@ def salva_descrizione():
     global disperso_corrente_idx
     cell = dispersi[disperso_corrente_idx]
     cell.color = color.red
+
+    cell.descrizione = input_description.text
+    try:
+        cell.ttl = int(input_ttl.text)
+    except ValueError:
+        cell.ttl = 30
+    
+    cell.scoperto = False
+    cell.morto = False
+
+    cell.scoperto = False
+    cell.morto = False
 
     descrizione_dispersi[(cell.grid_x, cell.grid_y)] = input_description.text
 
