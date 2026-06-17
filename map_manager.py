@@ -24,7 +24,7 @@ def is_connected(mappa_logica, w, h):
     visited = set([start_node])
     stack = [start_node]
     
-    # Espansione a macchia d'olio (Flood fill)
+    #controlla che tutte le celle vuote siano raggiungibili
     while stack:
         cx, cy = stack.pop()
         for dx, dy in [(0, 1), (0, -1), (1, 0), (-1, 0)]:
