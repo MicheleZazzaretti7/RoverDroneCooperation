@@ -6,7 +6,8 @@ import os
 from groq import Groq
 import state
 from simulation import avanza_tempo_globale, spawna_vittime
-import rover 
+import rover
+from state import log_messaggio
 
 CHIAVE_API = os.getenv("GROQ_API_KEY", "your_api_key")
 client_llm = Groq(api_key=CHIAVE_API)
@@ -56,7 +57,7 @@ def esegui_piano_volo_drone():
             nodo_soluzione = breadth_first_graph_search(problema_drone)
             if nodo_soluzione:
                 state.piano_volo_drone = nodo_soluzione.solution() 
-                print(f"[NAVIGAZIONE] Nuovo Waypoint: {obiettivo}. Rotta: {state.piano_volo_drone}")
+                state.log_messaggio(f"[NAVIGAZIONE] Nuovo Waypoint: {obiettivo}. Rotta: {state.piano_volo_drone}")
 
     if state.piano_volo_drone:
         prossima_mossa = state.piano_volo_drone.pop(0)
@@ -108,18 +109,18 @@ def controlla_visione_drone():
                         disp.color = color.black
                         disp.text = "X"
                         disp.text_color = color.red
-                        print(f"\n[DRONE] Avvistato cadavere in ({check_x}, {check_y}). Troppo tardi.")
+                        state.log_messaggio(f"\n[DRONE] Avvistato cadavere in ({check_x}, {check_y}). Troppo tardi.")
                     else:
                         disp.color = color.magenta
                         disp.text = str(disp.ttl) 
                         disp.text_color = color.white
-                        print(f"\n[DRONE] Avvistato soggetto VIVO in ({check_x}, {check_y})!")
+                        state.log_messaggio(f"\n[DRONE] Avvistato soggetto VIVO in ({check_x}, {check_y})!")
                         
                         thread = threading.Thread(target=chiama_llm_triage, args=(disp, getattr(disp, 'descrizione', 'Nessuna')))
                         thread.start()
 
 def chiama_llm_triage(cella_vittima, descrizione_visiva):
-    print(f"\n[LLM] Connessione a Groq... Generazione dispaccio per la situazione: '{descrizione_visiva}'")
+    state.log_messaggio(f"\n[LLM] Connessione a Groq... Generazione dispaccio per la situazione: '{descrizione_visiva}'")
     
     prompt_drone = f"""
     Sei l'IA visiva a bordo di un drone di ricognizione. 
@@ -139,7 +140,7 @@ def chiama_llm_triage(cella_vittima, descrizione_visiva):
             model="llama-3.1-8b-instant"
         )
         messaggio_radio = risposta.choices[0].message.content.strip()
-        print(f"\n [DISPACCIO DRONE-TO-ROVER] Da coord({cella_vittima.grid_x}, {cella_vittima.grid_y}):\n«{messaggio_radio}»")
+        state.log_messaggio(f"\n [DISPACCIO DRONE-TO-ROVER] Da coord({cella_vittima.grid_x}, {cella_vittima.grid_y}):\n«{messaggio_radio}»")
               
         if state.rover_agent_instance:
             nuovi_obiettivi = state.rover_agent_instance.receive_and_execute_mission(messaggio_radio)
@@ -148,9 +149,9 @@ def chiama_llm_triage(cella_vittima, descrizione_visiva):
                     if goal not in state.coda_obiettivi_rover:
                         state.coda_obiettivi_rover.append(goal)
                         
-                print(f"[SISTEMA] Coda attuale del Rover: {state.coda_obiettivi_rover}")
+                state.log_messaggio(f"[SISTEMA] Coda attuale del Rover: {state.coda_obiettivi_rover}")
                 if not state.rover_in_movimento and state.coda_obiettivi_rover:
                     rover.calcola_prossimo_percorso_rover()
 
     except Exception as e:
-        print(f"[ERRORE RADIO] Comunicazione fallita: {e}")
+        state.log_messaggio(f"[ERRORE RADIO] Comunicazione fallita: {e}")
