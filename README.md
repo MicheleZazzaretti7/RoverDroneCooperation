@@ -1,7 +1,7 @@
 # Rover Drone Cooperation 3D Search & Rescue AI Simulation
 Una piattaforma di simulazione avanzata per operazioni di ricerca e soccorso, che integra algoritmi di ricerca classici dell'intelligenza artificiale con i moderni modelli linguistici di grandi dimensioni (LLM).
 
-## 📝 Descrizione del Progetto
+##  Descrizione del Progetto
 
 Questo progetto simula uno scenario di emergenza in un ambiente 3D interattivo sviluppato con il motore **Ursina**. L'obiettivo è coordinare due agenti autonomi per localizzare e salvare vittime disperse in un territorio impervio, gestendo al contempo ostacoli naturali e vincoli temporali.
 
@@ -9,7 +9,7 @@ Questo progetto simula uno scenario di emergenza in un ambiente 3D interattivo s
 1.  **Il Drone (Esploratore):** Sorvola la mappa per individuare i dispersi e analizzare le loro condizioni tramite una "visione artificiale" simulata.
 2.  **Il Rover (Soccorritore):** Riceve i dispacci dal drone, pianifica il percorso ottimale evitando le montagne e raggiunge le vittime prima che il loro tempo di vita (TTL) scada.
 
-## 🚀 Caratteristiche Tecniche
+##  Caratteristiche Tecniche
 
 *   **Ambiente 3D Dinamico:** Sviluppato in Python con **Ursina Engine**, con generazione procedurale di ostacoli e validazione della connettività della mappa.
 *   **Algoritmi di Ricerca (Framework AIMA):**
@@ -20,7 +20,7 @@ Questo progetto simula uno scenario di emergenza in un ambiente 3D interattivo s
     *   **Google Gemini (2.5 Flash):** Analizza i messaggi radio ricevuti dal Rover per estrarre coordinate e pianificare la missione in base alla priorità.
 *   **Meccaniche di Simulazione:** Turni globali, decadimento della salute delle vittime e spawn dinamico di emergenze.
 
-## 📂 Struttura del Progetto
+##  Struttura del Progetto
 
 - `main.py`: Entry point dell'applicazione e inizializzazione UI.
 - `ui.py`: Gestione dei flussi di setup, inserimento dati e deploy degli agenti.
@@ -31,7 +31,7 @@ Questo progetto simula uno scenario di emergenza in un ambiente 3D interattivo s
 - `aima.py`: Implementazione degli algoritmi di ricerca (Russell & Norvig).
 - `simulation.py`: Motore temporale e gestione della vita dei dispersi.
 
-## 🛠️ Requisiti e Installazione
+##  Requisiti e Installazione
 
 ### Prerequisiti
 - Python 3.8 o superiore.
@@ -49,7 +49,7 @@ Questo progetto simula uno scenario di emergenza in un ambiente 3D interattivo s
     GEMINI_API_KEY="tua_chiave_gemini"
     ```
 
-## 🎮 Guida all'Uso
+##  Guida all'Uso
 
 1.  Lancia il programma: `python main.py`.
 2.  **Setup Mappa:** Imposta dimensioni, genera ostacoli casuali e verifica che non ci siano aree isolate.
