@@ -1,0 +1,245 @@
+from ursina import *
+import state
+from map_manager import toggle_obstacle_disperso, is_connected
+import drone
+import rover1
+
+def genera_mappa_vuota():
+    try:
+        state.map_w = int(state.input_longitude.text)
+        state.map_h = int(state.input_latitude.text)
+    except ValueError:
+        print("Inserisci numeri validi!")
+        return
+
+    state.map_panel.enabled = False
+    state.pannello_controlli.enabled = True
+
+    offset_x = (state.map_w - 1) / 2
+    offset_y = (state.map_h - 1) / 2
+
+    for x in range(state.map_w):
+        for y in range(state.map_h):
+            cell = Button(
+                parent=scene,
+                model='quad',
+                color=color.hex('#7CFC00'),
+                scale=0.95,
+                position=(x - offset_x, y - offset_y, 0),
+            )
+            cell.grid_x = x
+            cell.grid_y = y
+            cell.is_obstacle = False
+            cell.is_disperso = False
+            cell.on_click = Func(toggle_obstacle_disperso, cell) 
+            state.grid_cells.append(cell)
+
+    camera.orthographic = True
+    camera.fov = max(state.map_w, state.map_h) + 2
+
+def resetta_tutto():
+    for cell in state.grid_cells:
+        destroy(cell)
+    state.grid_cells.clear()
+
+    if state.error_text:
+        destroy(state.error_text)
+    
+    state.pannello_controlli.enabled = False
+    state.map_panel.enabled = True
+    camera.orthographic = False
+
+def conferma_mappa():
+    if state.error_text:
+        destroy(state.error_text)
+    
+    dispersi_presenti = sum(1 for cell in state.grid_cells if getattr(cell, 'is_disperso', False))
+
+    if dispersi_presenti < 3:
+        state.error_text = Text(
+            text="Errore: Devi posizionare almeno 3 dispersi sulla mappa!",
+            color=color.red, scale=1.2, origin=(0,0), y=-0.4, background=True
+        )
+        return
+    
+    mappa_logica = [[0 for _ in range(state.map_h)] for _ in range(state.map_w)]
+    for cell in state.grid_cells:
+        if getattr(cell, 'is_obstacle', False):
+            mappa_logica[cell.grid_x][cell.grid_y] = 1
+
+    if not is_connected(mappa_logica, state.map_w, state.map_h):
+        state.error_text = Text(
+            text="ERRORE: La mappa contiene aree inaccessibili!\nRimuovi alcuni ostacoli e riprova.",
+            color=color.red, scale=1.2, origin=(0, 0), y=-0.4, background=True
+        )
+        return
+
+    print("Connessione mappa verificata!")
+    inserimento_descrizioni()
+
+def inserimento_descrizioni():
+    state.dispersi = [c for c in state.grid_cells if getattr(c, 'is_disperso', False)]
+    state.descrizione_dispersi.clear()
+
+    if not state.dispersi:
+        print("[DEBUG] Lista dispersi vuota all'inserimento.")
+        state.pannello_controlli.enabled = False
+        return
+    
+    state.disperso_corrente_idx = 0
+    state.pannello_controlli.enabled = False
+    mostra_ui_descrizione()
+
+def mostra_ui_descrizione():
+    if state.panel_description:
+        destroy(state.panel_description)
+    
+    if state.disperso_corrente_idx >= len(state.dispersi):
+        print("Setup Completato! Avvio Simulazione 3D...")
+        inizia_posizionamento_agenti()
+        return
+    
+    cell = state.dispersi[state.disperso_corrente_idx]
+    cell.color = color.yellow
+
+    state.input_description = InputField(default_value=f"Soggetto {state.disperso_corrente_idx+1}")
+    state.input_ttl = InputField(default_value="30", character_limit=3)
+
+    state.panel_description = WindowPanel(
+        title=f'Disperso {state.disperso_corrente_idx+1}/{len(state.dispersi)} a ({cell.grid_x}, {cell.grid_y})',
+        content=(
+            Text(text='Inserisci la descrizione:  \ninserire la situazione del disperso, se ferito o meno'),
+            state.input_description,
+            Space(height=1),
+            Text(text='Turni di vita stimati (Reali):'),
+            state.input_ttl,
+            Space(height=1),
+            Button(text='Salva', color=color.green, on_click=salva_descrizione)
+        ),
+        position=(0, 0.2)
+    )
+
+def salva_descrizione():
+    cell = state.dispersi[state.disperso_corrente_idx]
+    cell.color = color.red
+    cell.descrizione = state.input_description.text
+    
+    try:
+        cell.ttl = int(state.input_ttl.text)
+    except ValueError:
+        cell.ttl = 30
+    
+    cell.scoperto = False
+    cell.morto = False
+    cell.salvato = False
+
+    state.descrizione_dispersi[(cell.grid_x, cell.grid_y)] = state.input_description.text
+    state.disperso_corrente_idx += 1
+    mostra_ui_descrizione()
+
+def inizia_posizionamento_agenti():
+    for cell in state.grid_cells:
+        cell.on_click = Func(seleziona_posizione_agente, cell)
+    
+    state.stato_posizionamento = 'DRONE'
+
+    state.testo_istruzioni = Text(
+        text="Fase di deploy: \nClicca su una cella per posizionare il drone",
+        origin=(0,0), y=0.4, scale=1.5, color=color.cyan, background=True
+    )
+
+def seleziona_posizione_agente(cell):
+    if state.error_text:
+        destroy(state.error_text)
+        state.error_text = None
+    
+    if state.stato_posizionamento == 'DRONE':
+        state.start_drone_pos = (cell.grid_x, cell.grid_y)
+        cell.color = color.cyan
+        cell.text = "D"
+        state.stato_posizionamento = 'ROVER'
+        state.testo_istruzioni.text = "Fase di deploy: \nClicca su una cella per posizionare il rover\n(Non può essere su una montagna o un disperso!)"
+        state.testo_istruzioni.color = color.orange
+        return
+
+    elif state.stato_posizionamento == 'ROVER':
+        if getattr(cell, 'is_obstacle', False) or getattr(cell, 'is_disperso', False):
+            state.error_text = Text(
+                text="Il rover non può partire su una montagna o un disperso!\nScegli una cella libera.",
+                color=color.red, scale=1.2, origin=(0, 0), y=-0.4, background=True
+            )
+            return
+        state.start_rover_pos = (cell.grid_x, cell.grid_y)
+    
+    cell.color = color.orange
+    cell.text ="R"
+    state.stato_posizionamento = None
+    state.testo_istruzioni.text = "Deploy completato! Avvio simulazione"
+    state.testo_istruzioni.color = color.green
+
+    invoke(avvia_simulazione_3d, delay=0.5)
+
+def avvia_simulazione_3d():
+    if state.testo_istruzioni:
+        destroy(state.testo_istruzioni)
+    
+    if state.pannello_controlli: state.pannello_controlli.enabled = False
+    if state.map_panel: state.map_panel.enabled = False
+
+    for cell in state.grid_cells:
+        cell.on_click = lambda: None
+        cell.collider = None
+
+        if getattr(cell, 'text_entity', None):
+            cell.text_entity.disable()
+
+        cell.model = 'cube'
+        cell.texture = 'montagna.jpg'
+        cell.scale_z = 0.2
+        cell.z = 0
+        Entity(parent=cell, model='cube', color=color.black, wireframe=True, scale=1.05)
+
+        if getattr(cell, 'is_obstacle', False):
+            montagna = Entity(
+                parent=scene,
+                model=Cone(resolution=4),
+                texture='montagna.jpg',
+                scale=(0.7, 1.3, 0.7),
+                position=(cell.x, cell.y, -0.50),
+                rotation=(-90,0,0)
+            )
+            Entity(parent=montagna, model=Cone(resolution=4), color=color.black, wireframe=True, scale=1.05)
+        elif getattr(cell, 'is_disperso', False):
+            cell.color = color.hex('#7CFC00')
+            cell.texture = 'grass.jpg'
+            state.vittime_nascoste.append(cell)
+        else:
+            cell.color = color.hex('#7CFC00')
+            cell.texture = 'grass.jpg'
+
+    camera.orthographic = False
+    EditorCamera()
+    
+    offset_x = (state.map_w - 1) / 2
+    offset_y = (state.map_h - 1) / 2
+    
+    start_drone_x, start_drone_y = state.start_drone_pos
+    start_rover_x, start_rover_y = state.start_rover_pos
+    
+    real_drone_x = start_drone_x - offset_x
+    real_drone_y = start_drone_y - offset_y
+    real_rover_x = start_rover_x - offset_x
+    real_rover_y = start_rover_y - offset_y
+    
+    # Istanziazione Agenti
+    state.drone = Entity(model='craft_speederA.obj', color=color.cyan, texture='metallo.jpg', scale=0.6, position=(real_drone_x, real_drone_y, -2.5), rotation=(-90, 0, 0))
+    state.drone.grid_x = start_drone_x
+    state.drone.grid_y = start_drone_y
+    
+    state.rover = Entity(model='craft_miner.obj', color=color.orange, texture='metallo.jpg', scale=0.7, position=(real_rover_x, real_rover_y, -0.5), rotation=(-90, 0, 0))
+    state.rover.grid_x = start_rover_x
+    state.rover.grid_y = start_rover_y
+
+    state.rover_agent_instance = rover1.RoverAgent((start_rover_x, start_rover_y)) 
+    
+    invoke(drone.esegui_piano_volo_drone, delay=1.0)
