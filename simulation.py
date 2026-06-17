@@ -1,6 +1,7 @@
 from ursina import color
 import random
 import state
+from state import log_messaggio
 
 def avanza_tempo_globale():
     """Questa funzione fa scorrere un turno di vita per tutti i dispersi non salvati e non morti."""
@@ -23,9 +24,9 @@ def avanza_tempo_globale():
                     cell.color = color.black
                     cell.text = "X"
                     cell.text_color = color.red
-                    print(f"[TRAGEDIA] Il soggetto in ({cell.grid_x}, {cell.grid_y}) è deceduto prima dei soccorsi.")
+                    state.log_messaggio(f"[TRAGEDIA] Il soggetto in ({cell.grid_x}, {cell.grid_y}) è deceduto prima dei soccorsi.")
                 else:
-                    print(f"[SISTEMA] Segnale vitale perso da una posizione sconosciuta...")
+                    state.log_messaggio(f"[SISTEMA] Segnale vitale perso da una posizione sconosciuta...")
 
 def spawna_vittime(quantita=2):
     """Fa comparire un numero specifico di vittime nascoste."""
@@ -38,7 +39,7 @@ def spawna_vittime(quantita=2):
             
             # Cambia il colore in rosso per segnalare l'emergenza comparsa
             nuova_vittima.color = color.red
-            print(f"[SISTEMA] Nuova emergenza rilevata in ({nuova_vittima.grid_x}, {nuova_vittima.grid_y})!")
+            state.log_messaggio(f"[SISTEMA] Nuova emergenza rilevata in ({nuova_vittima.grid_x}, {nuova_vittima.grid_y})!")
 
 
 
