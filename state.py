@@ -1,3 +1,4 @@
+import textwrap
 grid_cells = []
 map_w = 0
 map_h = 0
@@ -43,3 +44,29 @@ percorso_rover_corrente = []
 # --- SISTEMA DI LOG A SCHERMO ---
 registro_log = []          # Conterrà le ultime righe di testo inviate
 pannello_log_testo = None  # L'entità Text di Ursina che mostrerà i log
+
+def log_messaggio(testo):
+    """Stampa in console e aggiorna il pannello 3D andando a capo automaticamente."""
+    print(testo)  # Mantiene la stampa standard nel terminale per debug
+
+    # Definisci quanti caratteri al massimo deve contenere una riga prima di andare a capo
+    LARGHEZZA_MASSIMA_RIGA = 45 
+
+    # Separiamo prima il testo se ci sono già dei vado a capo (\n) manuali
+    righe_originali = testo.strip().split('\n')
+    
+    for riga in righe_originali:
+        if riga.strip():
+            # textwrap.wrap spezza la riga in una lista di righe più corte senza tagliare le parole
+            righe_formattate = textwrap.wrap(riga, width=LARGHEZZA_MASSIMA_RIGA)
+            for riga_wrap in righe_formattate:
+                registro_log.append(riga_wrap)
+
+    # Dato che ora andiamo a capo più spesso, aumentiamo il numero di righe 
+    # visibili a schermo (es. ultime 14 righe invece di 10)
+    while len(registro_log) > 14:
+        registro_log.pop(0)
+
+    # Aggiorna il pannello grafico
+    if pannello_log_testo:
+        pannello_log_testo.text = "\n".join(registro_log)
