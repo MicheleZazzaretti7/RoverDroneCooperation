@@ -5,7 +5,8 @@ import os
 import state
 from simulation import avanza_tempo_globale
 from dotenv import load_dotenv
-from google import genai 
+from google import genai
+from state import log_messaggio
 
 load_dotenv()
 API_KEY_GEMINI = os.getenv("GEMINI_API_KEY", "your_api_key")
@@ -64,15 +65,15 @@ class RoverAgent:
         return extracted_goals
 
     def receive_and_execute_mission(self, drone_message):
-        print(f"\n[ROVER - RADIO] Ricevuto dispaccio:\n{drone_message}")
+        state.log_messaggio(f"\n[ROVER - RADIO] Ricevuto dispaccio:\n{drone_message}")
         goals = self._extract_goals_with_llm(drone_message)
-        print(f"[ROVER - LLM] Obiettivi calcolati: {goals}")
+        state.log_messaggio(f"[ROVER - LLM] Obiettivi calcolati: {goals}")
         return goals
 
 def calcola_prossimo_percorso_rover():
     if not state.coda_obiettivi_rover:
         state.rover_in_movimento = False
-        print("[ROVER] Tutti gli obiettivi raggiunti. In attesa...")
+        state.log_messaggio("[ROVER] Tutti gli obiettivi raggiunti. In attesa...")
         return
         
     state.rover_in_movimento = True
@@ -86,22 +87,22 @@ def calcola_prossimo_percorso_rover():
     
     if nodo_soluzione:
         state.percorso_rover_corrente = [n.state for n in nodo_soluzione.path()][1:]
-        print(f"  [A*] Rotta per {obiettivo_attuale} calcolata! Passi: {len(state.percorso_rover_corrente)}")
+        state.log_messaggio(f"  [A*] Rotta per {obiettivo_attuale} calcolata! Passi: {len(state.percorso_rover_corrente)}")
         esegui_passo_rover()
     else:
-        print(f"  [A*] ERRORE: Nessuna rotta sicura per {obiettivo_attuale}. Salto bersaglio.")
+        state.log_messaggio(f"  [A*] ERRORE: Nessuna rotta sicura per {obiettivo_attuale}. Salto bersaglio.")
         calcola_prossimo_percorso_rover()
 
 def esegui_passo_rover():
     if not state.percorso_rover_corrente:
-        print(f"[ROVER] Arrivato alla destinazione pianificata!")
+        state.log_messaggio(f"[ROVER] Arrivato alla destinazione pianificata!")
         for c in state.grid_cells:
             if c.grid_x == state.rover.grid_x and c.grid_y == state.rover.grid_y and getattr(c, 'is_disperso', False):
                 if not getattr(c, 'morto', False) and not getattr(c, 'salvato', False):
                     c.color = color.blue 
                     c.text = "OK"
                     c.salvato = True 
-                    print(f"  [ROVER] Vittima in ({c.grid_x}, {c.grid_y}) salvata con successo!")
+                    state.log_messaggio(f"  [ROVER] Vittima in ({c.grid_x}, {c.grid_y}) salvata con successo!")
         
         invoke(calcola_prossimo_percorso_rover, delay=1.5)
         return
@@ -126,7 +127,7 @@ def esegui_passo_rover():
                 c.text = "OK"
                 c.salvato = True
                 vittima_incontrata = True
-                print(f"\n[ROVER] INCONTRO FORTUITO! Salvata vittima non programmata in ({nuovo_x}, {nuovo_y})!")
+                state.log_messaggio(f"\n[ROVER] INCONTRO FORTUITO! Salvata vittima non programmata in ({nuovo_x}, {nuovo_y})!")
                 if (nuovo_x, nuovo_y) in state.coda_obiettivi_rover:
                     state.coda_obiettivi_rover.remove((nuovo_x, nuovo_y))
 
