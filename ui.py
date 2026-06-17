@@ -246,7 +246,7 @@ def avvia_simulazione_3d():
         parent=camera.ui,
         model='quad',
         color=color.rgba(0, 0, 0, 200),  # Nero con opacità
-        scale=(0.55, 0.45),              # Larghezza, Altezza
+        scale=(0.45, 0.45),              # Larghezza, Altezza
         position=(-0.60, 0.25),         # Posizionato in alto a sinistra
         z=1
     )
