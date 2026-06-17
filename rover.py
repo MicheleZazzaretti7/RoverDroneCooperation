@@ -46,29 +46,50 @@ class RoverAgent:
         self.client = client_gemini  
         self.model_name = 'gemini-2.5-flash' 
 
-    def _extract_goals_with_llm(self, text_message):
+def _extract_goals_with_llm(self, text_message, coda_attuale):
         current_rover_pos = self.position 
+        
+        # Trasformiamo la coda attuale in testo per farla leggere all'LLM
+        coda_str = ", ".join([f"({x},{y})" for x, y in coda_attuale]) if coda_attuale else "Nessun obiettivo in attesa."
+
         prompt = f"""
-        Sei il sistema di navigazione di un Rover. Posizione attuale: {current_rover_pos}.
-        Analizza questo dispaccio radio e ordina le vittime.
-        Regole: 1. Priorità medica (Alta, Media, Bassa). 2. A pari priorità, il più vicino.
-        Rispondi SOLO con le coordinate numeriche estratte dal testo, una per riga (formato: x,y). Nessun commento.
-        Messaggio: "{text_message}"
+        Sei il sistema di navigazione tattica di un Rover di soccorso. 
+        Posizione attuale del Rover: {current_rover_pos}.
+        Obiettivi attuali in attesa (da riorganizzare): {coda_str}
+        
+        Hai appena ricevuto questo nuovo dispaccio radio: "{text_message}"
+        
+        IL TUO COMPITO:
+        1. Estrai le nuove coordinate dal dispaccio radio.
+        2. Unisci le nuove coordinate con gli "Obiettivi attuali in attesa".
+        3. Riorganizza l'INTERA lista dando precedenza assoluta alle emergenze mediche (priorità Alta).
+        4. A parità di priorità, metti per primo l'obiettivo più vicino al Rover. (Se non conosci la priorità dei vecchi obiettivi in attesa, considerali di priorità Media).
+        
+        RISPOSTA TASSATIVA:
+        Rispondi SOLO con la lista completa e aggiornata delle coordinate, una per riga nel formato: X, Y. 
+        Non aggiungere testo, commenti o coordinate non presenti.
         """
         response = self.client.models.generate_content(model=self.model_name, contents=prompt)
         text_output = response.text.strip()
+        
         extracted_goals = []
         for line in text_output.split('\n'):
             match = re.search(r'(\d+)\s*,\s*(\d+)', line)
             if match:
                 extracted_goals.append((int(match.group(1)), int(match.group(2))))
-        return extracted_goals
+                
+        # Rimuoviamo eventuali doppioni creati dall'LLM, preservando l'ordine di priorità
+        final_goals = list(dict.fromkeys(extracted_goals))
+        return final_goals
 
     def receive_and_execute_mission(self, drone_message):
         state.log_messaggio(f"\n[ROVER - RADIO] Ricevuto dispaccio:\n{drone_message}")
-        goals = self._extract_goals_with_llm(drone_message)
-        state.log_messaggio(f"[ROVER - LLM] Obiettivi calcolati: {goals}")
-        return goals
+        
+        # Passiamo a Gemini anche la coda di salvataggio attuale dello stato
+        nuova_coda_ordinata = self._extract_goals_with_llm(drone_message, state.coda_obiettivi_rover)
+        
+        state.log_messaggio(f"[ROVER - TATTICA LLM] Nuova coda riordinata: {nuova_coda_ordinata}")
+        return nuova_coda_ordinata
 
 def calcola_prossimo_percorso_rover():
     if not state.coda_obiettivi_rover:
