@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 from google import genai 
 # Carica la chiave dal file .env se presente
 load_dotenv()
-API_KEY_GEMINI = os.getenv("GEMINI_API_KEY", "AIzaSyBMZzOOY0SZuCqLU2PrGnSe_nMtRaHuEdk")
+API_KEY_GEMINI = os.getenv("GEMINI_API_KEY", "your_api_key")
 client_gemini = genai.Client(api_key=API_KEY_GEMINI) if API_KEY_GEMINI else genai.Client()
 
 # Coda di animazione del Rover
