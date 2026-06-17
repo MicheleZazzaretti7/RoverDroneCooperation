@@ -143,13 +143,16 @@ def chiama_llm_triage(cella_vittima, descrizione_visiva):
         state.log_messaggio(f"\n [DISPACCIO DRONE-TO-ROVER] Da coord({cella_vittima.grid_x}, {cella_vittima.grid_y}):\n«{messaggio_radio}»")
               
         if state.rover_agent_instance:
-            nuovi_obiettivi = state.rover_agent_instance.receive_and_execute_mission(messaggio_radio)
-            if nuovi_obiettivi:
-                for goal in nuovi_obiettivi:
-                    if goal not in state.coda_obiettivi_rover:
-                        state.coda_obiettivi_rover.append(goal)
+            # L'LLM ora restituisce la lista MASTER già completa e ordinata
+            nuova_coda_completa = state.rover_agent_instance.receive_and_execute_mission(messaggio_radio)
+            
+            if nuova_coda_completa:
+                # Sovrascriviamo in blocco la coda in Python
+                state.coda_obiettivi_rover = nuova_coda_completa
                         
-                state.log_messaggio(f"[SISTEMA] Coda attuale del Rover: {state.coda_obiettivi_rover}")
+                state.log_messaggio(f"[SISTEMA] Nuova rotta operativa: {state.coda_obiettivi_rover}")
+                
+                # Se il rover era fermo, lo facciamo partire
                 if not state.rover_in_movimento and state.coda_obiettivi_rover:
                     rover.calcola_prossimo_percorso_rover()
 
