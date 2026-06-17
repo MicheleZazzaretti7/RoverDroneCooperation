@@ -2,7 +2,7 @@ from ursina import *
 import state
 from map_manager import toggle_obstacle_disperso, is_connected
 import drone
-import rover1
+import rover
 
 def genera_mappa_vuota():
     try:
@@ -240,6 +240,41 @@ def avvia_simulazione_3d():
     state.rover.grid_x = start_rover_x
     state.rover.grid_y = start_rover_y
 
-    state.rover_agent_instance = rover1.RoverAgent((start_rover_x, start_rover_y)) 
+    state.rover_agent_instance = rover.RoverAgent((start_rover_x, start_rover_y))
+
+        sfondo_console = Entity(
+        parent=camera.ui,
+        model='quad',
+        color=color.rgba(0, 0, 0, 200),  # Nero con opacità
+        scale=(0.55, 0.45),              # Larghezza, Altezza
+        position=(-0.60, 0.25),         # Posizionato in alto a sinistra
+        z=1
+    )
+    
+    # 2. Titolo fisso della console
+    Text(
+        parent=camera.ui,
+        text="[ CONSOLE DI SISTEMA ]",
+        color=color.cyan,
+        scale=1.1,
+        origin=(0, 0),
+        position=(-0.60, 0.45) # Centrato rispetto allo sfondo
+    )
+
+    # 3. Il testo dinamico vero e proprio
+    testo_log_interno = Text(
+        parent=camera.ui,
+        text="",
+        scale=0.9,
+        color=color.yellow,
+        origin=(-0.5, 0.5),      # Allineato in alto a sinistra
+        position=(-0.85, 0.42)   # Posizionato dentro lo sfondo scuro
+    )
+    
+    # Salviamo l'entità di testo nello stato
+    state.pannello_log_testo = testo_log_interno
+    
+    # Inviamo il primo messaggio!
+    state.log_messaggio("[SISTEMA] Avvio simulazione 3D...")
     
     invoke(drone.esegui_piano_volo_drone, delay=1.0)
