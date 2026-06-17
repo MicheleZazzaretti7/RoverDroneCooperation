@@ -46,7 +46,7 @@ class RoverAgent:
         self.client = client_gemini  
         self.model_name = 'gemini-2.5-flash' 
 
-def _extract_goals_with_llm(self, text_message, coda_attuale):
+    def _extract_goals_with_llm(self, text_message, coda_attuale):
         current_rover_pos = self.position 
         
         # Trasformiamo la coda attuale in testo per farla leggere all'LLM
