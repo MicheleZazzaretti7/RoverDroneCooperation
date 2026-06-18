@@ -6,7 +6,7 @@ import os
 from groq import Groq
 import state
 from simulation import avanza_tempo_globale, spawna_vittime
-import rover # Importato per poter avviare il rover dopo il messaggio radio
+from rover import *
 from state import log_messaggio
 
 CHIAVE_API = os.getenv("GROQ_API_KEY", "your_api_key")
