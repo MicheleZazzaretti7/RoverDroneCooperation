@@ -44,44 +44,45 @@ class RoverAgent:
     def __init__(self, initial_position):
         self.position = initial_position
         self.client = client_gemini  
-        self.model_name = 'gemini-2.5-flash' 
+        self.model_name = 'gemini-2.5-flash-lite' 
 
     def _extract_goals_with_llm(self, text_message, coda_attuale):
         current_rover_pos = self.position 
         
-        # Trasformiamo la coda attuale in testo per farla leggere all'LLM
-        coda_str = ", ".join([f"({x},{y})" for x, y in coda_attuale]) if coda_attuale else "Nessun obiettivo in attesa."
+        # ORA coda_attuale contiene ((x, y), 'Priorità'). Formattiamo la stringa di conseguenza:
+        coda_str = ", ".join([f"({x},{y}) [Priorità: {p}]" for (x, y), p in coda_attuale]) if coda_attuale else "Nessun obiettivo in attesa."
 
         prompt = f"""
-        Sei il sistema di navigazione tattica di un Rover di soccorso. 
+        Sei il sistema di comunicazione di un Rover di soccorso che comunica con un drone di ricognizione in ambiente montano della protezione civile. 
         Posizione attuale del Rover: {current_rover_pos}.
-        Obiettivi attuali in attesa (da riorganizzare): {coda_str}
+        Obiettivi attuali in attesa in ordine di priorità: {coda_str}
         
         Hai appena ricevuto questo nuovo dispaccio radio: "{text_message}"
         
         IL TUO COMPITO:
-        1. Estrai le nuove coordinate dal dispaccio radio.
-        2. Unisci le nuove coordinate con gli "Obiettivi attuali in attesa".
-        3. Riorganizza l'INTERA lista dando precedenza assoluta alle emergenze mediche (priorità Alta).
-        4. A parità di priorità, metti per primo l'obiettivo più vicino al Rover. (Se non conosci la priorità dei vecchi obiettivi in attesa, considerali di priorità Media).
+        1. Estrai le nuove coordinate dal dispaccio radio e identifica la priorità medica indicata.
+        2. Concatena il nuovo obiettivo agli "Obiettivi attuali in attesa" riordinandoli rispetto alla priorità assegnatagli.  la scala di priorità è "Alta > Media > Bassa".
+        3. A parità di priorità, metti per primo l'obiettivo più vicino al Rover.
         
         RISPOSTA TASSATIVA:
-        Rispondi SOLO con la lista completa e aggiornata delle coordinate, una per riga nel formato: X, Y. 
-        Non aggiungere testo, commenti o coordinate non presenti.
+        Rispondi SOLO con la lista completa e aggiornata, una per riga nel formato esatto: X, Y, Priorità.
+        Non aggiungere testo, commenti o altro.
         """
         response = self.client.models.generate_content(model=self.model_name, contents=prompt)
         text_output = response.text.strip()
         
         extracted_goals = []
         for line in text_output.split('\n'):
-            match = re.search(r'(\d+)\s*,\s*(\d+)', line)
+            # Modifichiamo la Regex per prendere anche la priorità
+            match = re.search(r'(\d+)\s*,\s*(\d+)\s*,\s*(Alta|Media|Bassa)', line, re.IGNORECASE)
             if match:
-                extracted_goals.append((int(match.group(1)), int(match.group(2))))
+                x = int(match.group(1))
+                y = int(match.group(2))
+                priorita = match.group(3).capitalize()
+                extracted_goals.append(((x, y), priorita))
                 
-        # Rimuoviamo eventuali doppioni creati dall'LLM, preservando l'ordine di priorità
-        final_goals = list(dict.fromkeys(extracted_goals))
-        return final_goals
-
+        return extracted_goals
+    
     def receive_and_execute_mission(self, drone_message):
         state.log_messaggio(f"\n[ROVER - RADIO] Ricevuto dispaccio:\n{drone_message}")
         
@@ -98,12 +99,17 @@ def calcola_prossimo_percorso_rover():
         return
         
     state.rover_in_movimento = True
-    obiettivo_attuale = state.coda_obiettivi_rover.pop(0)
+    # Adesso estraiamo sia le coordinate che la priorità
+    obiettivo_dati = state.coda_obiettivi_rover.pop(0)
+    obiettivo_attuale = obiettivo_dati[0] # Prende solo (X, Y)
+    priorita = obiettivo_dati[1]          # Prende la priorità (es. 'Alta')
+    
+    state.obiettivo_corrente = obiettivo_attuale # Salviamo nello state per esegui_passo_rover
+    state.log_messaggio(f"[ROVER] Dirigendosi a {obiettivo_attuale} (Priorità: {priorita})")
     
     ostacoli = set((c.grid_x, c.grid_y) for c in state.grid_cells if getattr(c, 'is_obstacle', False))
     start_pos = (state.rover.grid_x, state.rover.grid_y)
     problema = GridNavigationProblem(start_pos, obiettivo_attuale, state.map_w, state.map_h, ostacoli)
-    
     nodo_soluzione = astar_search(problema)
     
     if nodo_soluzione:
@@ -148,9 +154,13 @@ def esegui_passo_rover():
                 c.text = "OK"
                 c.salvato = True
                 vittima_incontrata = True
-                state.log_messaggio(f"\n[ROVER] INCONTRO FORTUITO! Salvata vittima non programmata in ({nuovo_x}, {nuovo_y})!")
-                if (nuovo_x, nuovo_y) in state.coda_obiettivi_rover:
-                    state.coda_obiettivi_rover.remove((nuovo_x, nuovo_y))
-
+                
+                # Controlla se è l'obiettivo principale o un incontro fortuito
+                if hasattr(state, 'obiettivo_corrente') and (nuovo_x, nuovo_y) == state.obiettivo_corrente:
+                    state.log_messaggio(f"\n[ROVER] Obiettivo raggiunto! Salvata vittima in ({nuovo_x}, {nuovo_y}).")
+                else:
+                    state.log_messaggio(f"\n[ROVER] INCONTRO FORTUITO! Salvata vittima non programmata in ({nuovo_x}, {nuovo_y})!")
+                    # Rimuove l'obiettivo raggiunto dalla coda filtrandolo
+                    state.coda_obiettivi_rover = [ob for ob in state.coda_obiettivi_rover if ob[0] != (nuovo_x, nuovo_y)]
     ritardo_prossimo_passo = 1.5 if vittima_incontrata else 0.5
     invoke(esegui_passo_rover, delay=ritardo_prossimo_passo)
