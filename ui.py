@@ -82,7 +82,7 @@ def inserimento_descrizioni():
     state.descrizione_dispersi.clear()
 
     if not state.dispersi:
-        print("[DEBUG] Lista dispersi vuota all'inserimento.")
+        state.log_messaggio("[DEBUG] Lista dispersi vuota all'inserimento.")
         state.pannello_controlli.enabled = False
         return
     
@@ -102,21 +102,33 @@ def mostra_ui_descrizione():
     cell = state.dispersi[state.disperso_corrente_idx]
     cell.color = color.yellow
 
-    state.input_description = InputField(default_value=f"Soggetto {state.disperso_corrente_idx+1}")
-    state.input_ttl = InputField(default_value="30", character_limit=3)
+    state.input_description = InputField(
+        default_value=f"Soggetto {state.disperso_corrente_idx+1}",
+        character_limit=100,
+        max_lines=5,
+        )
+    
+    state.input_description.scale_y=0.60
+    state.input_description.wordwrap=35
+    state.input_ttl = InputField(
+        default_value="30",
+        character_limit=3
+    )
 
     state.panel_description = WindowPanel(
         title=f'Disperso {state.disperso_corrente_idx+1}/{len(state.dispersi)} a ({cell.grid_x}, {cell.grid_y})',
+        position=(0, 0.2),
         content=(
-            Text(text='Inserisci la descrizione:  \ninserire la situazione del disperso, se ferito o meno'),
+            Text(text='Inserisci la descrizione:', color=color.azure),
+            Text(text='Indica situazione, ferite e stato del disperso.', scale=0.8, wordwrap=45),
+
             state.input_description,
-            Space(height=1),
+            Space(height=0.5),
             Text(text='Turni di vita stimati (Reali):'),
             state.input_ttl,
-            Space(height=1),
-            Button(text='Salva', color=color.green, on_click=salva_descrizione)
-        ),
-        position=(0, 0.2)
+            Space(height=0.5),
+            Button(text='Salva Descrizione', color=color.green, on_click=salva_descrizione)
+        )
     )
 
 def salva_descrizione():
@@ -155,7 +167,7 @@ def seleziona_posizione_agente(cell):
     
     if state.stato_posizionamento == 'DRONE':
         state.start_drone_pos = (cell.grid_x, cell.grid_y)
-        cell.color = color.cyan
+        #cell.color = color.cyan
         cell.text = "D"
         state.stato_posizionamento = 'ROVER'
         state.testo_istruzioni.text = "Fase di deploy: \nClicca su una cella per posizionare il rover\n(Non può essere su una montagna o un disperso!)"
@@ -236,13 +248,13 @@ def avvia_simulazione_3d():
     state.drone.grid_x = start_drone_x
     state.drone.grid_y = start_drone_y
     
-    state.rover = Entity(model='craft_miner.obj', color=color.orange, texture='metallo.jpg', scale=0.7, position=(real_rover_x, real_rover_y, -0.5), rotation=(-90, 0, 0))
+    state.rover = Entity(model='craft_miner.obj', color=color.orange, texture='metallo.jpg', scale=0.5, position=(real_rover_x, real_rover_y, -0.5), rotation=(-90, 0, 0))
     state.rover.grid_x = start_rover_x
     state.rover.grid_y = start_rover_y
 
     state.rover_agent_instance = rover.RoverAgent((start_rover_x, start_rover_y))
 
-        sfondo_console = Entity(
+    sfondo_console = Entity(
         parent=camera.ui,
         model='quad',
         color=color.rgba(0, 0, 0, 200),  # Nero con opacità
@@ -276,5 +288,7 @@ def avvia_simulazione_3d():
     
     # Inviamo il primo messaggio!
     state.log_messaggio("[SISTEMA] Avvio simulazione 3D...")
+
     
     invoke(drone.esegui_piano_volo_drone, delay=1.0)
+
