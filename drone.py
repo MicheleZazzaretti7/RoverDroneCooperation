@@ -6,7 +6,7 @@ import os
 from groq import Groq
 import state
 from simulation import avanza_tempo_globale, spawna_vittime
-import rover
+import rover # Importato per poter avviare il rover dopo il messaggio radio
 from state import log_messaggio
 
 CHIAVE_API = os.getenv("GROQ_API_KEY", "your_api_key")
@@ -123,17 +123,19 @@ def chiama_llm_triage(cella_vittima, descrizione_visiva):
     state.log_messaggio(f"\n[LLM] Connessione a Groq... Generazione dispaccio per la situazione: '{descrizione_visiva}'")
     
     prompt_drone = f"""
-    Sei l'IA visiva a bordo di un drone di ricognizione. 
-    Hai appena scansionato un sopravvissuto alle coordinate X={cella_vittima.grid_x}, Y={cella_vittima.grid_y}. 
+    Sei un drone di ricognizione di un ambiente montano della protezione civile. 
+    Hai appena identificato un ferito alle coordinate X={cella_vittima.grid_x}, Y={cella_vittima.grid_y}. 
     La sua descrizione visiva è: "{descrizione_visiva}".
-    Il tuo compito è inviare un singolo, breve messaggio radio (massimo 2 frasi) all'IA del Rover di recupero.
+    Il tuo compito è inviare un singolo, breve messaggio radio (massimo 2 frasi) al Rover di recupero.
     Regole TASSATIVE:
     1. Includi SEMPRE le coordinate nel messaggio.
-    2. Indica la priorità medica (alta, media o bassa) basandoti ESCLUSIVAMENTE sulla descrizione.
-    3. SE la descrizione non descrive ferite o sintomi, NON INVENTARE NULLA. Dichiara stato "sconosciuto" e priorità "media".
-    4. Non menzionare numeri temporali.
+    2. Fai una valutazione della gravità della situazione in base a: {descrizione_visiva} 
+    3. Indica la priorità medica ("alta", "media" o "bassa") in base alla gravità valutata.
+    4. SE {descrizione_visiva} non descrive ferite o sintomi, Dichiara stato e priorità "sconosciuto" .
+    6. REGOLA D'ORO: Rispondi SOLO ed ESCLUSIVAMENTE con il testo del messaggio radio. NON aggiungere premesse (es. "Ecco il messaggio"), NON aggiungere saluti, NON aggiungere giustificazioni finali (es. "Ho scelto questo perché..."). Qualsiasi parola fuori dal messaggio radio farà fallire la missione.
     """
     
+    #     5. Non menzionare numeri temporali.
     try:
         risposta = client_llm.chat.completions.create(
             messages=[{"role": "user", "content": prompt_drone}],
