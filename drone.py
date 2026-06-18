@@ -9,7 +9,7 @@ from simulation import avanza_tempo_globale, spawna_vittime
 from rover import *
 from state import log_messaggio
 
-CHIAVE_API = os.getenv("GROQ_API_KEY", "your_api_key")
+CHIAVE_API = os.getenv("GROQ_API_KEY")
 client_llm = Groq(api_key=CHIAVE_API)
 
 class DroneExplorationProblem(Problem):
