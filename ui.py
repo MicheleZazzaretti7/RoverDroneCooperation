@@ -31,6 +31,7 @@ def genera_mappa_vuota():
             cell.grid_y = y
             cell.is_obstacle = False
             cell.is_disperso = False
+            cell.is_ospedale = False
             cell.on_click = Func(toggle_obstacle_disperso, cell) 
             state.grid_cells.append(cell)
 
@@ -82,7 +83,7 @@ def inserimento_descrizioni():
     state.descrizione_dispersi.clear()
 
     if not state.dispersi:
-        state.log_messaggio("[DEBUG] Lista dispersi vuota all'inserimento.")
+        print("[DEBUG] Lista dispersi vuota all'inserimento.")
         state.pannello_controlli.enabled = False
         return
     
@@ -96,7 +97,7 @@ def mostra_ui_descrizione():
     
     if state.disperso_corrente_idx >= len(state.dispersi):
         print("Setup Completato! Avvio Simulazione 3D...")
-        inizia_posizionamento_agenti()
+        inizia_posizionamento_agenti_ospedale()
         return
     
     cell = state.dispersi[state.disperso_corrente_idx]
@@ -104,32 +105,54 @@ def mostra_ui_descrizione():
 
     state.input_description = InputField(
         default_value=f"Soggetto {state.disperso_corrente_idx+1}",
-        character_limit=100,
-        max_lines=5,
-        )
+        character_limit=150,
+        max_lines=10,
+        scale=(0.8, 0.12)
+    )
+
+    tf = state.input_description.text_field
+    old_text_scale = tf.text_entity.world_scale_x        # valore PRIMA che WindowPanel lo tocchi
+    old_cursor_scale_x = tf.cursor_parent.world_scale_x
+    old_cursor_scale_y = tf.cursor_parent.world_scale_y
     
-    state.input_description.scale_y=0.60
-    state.input_description.wordwrap=35
     state.input_ttl = InputField(
         default_value="30",
-        character_limit=3
+        character_limit=2
     )
+
 
     state.panel_description = WindowPanel(
         title=f'Disperso {state.disperso_corrente_idx+1}/{len(state.dispersi)} a ({cell.grid_x}, {cell.grid_y})',
         position=(0, 0.2),
         content=(
-            Text(text='Inserisci la descrizione:', color=color.azure),
-            Text(text='Indica situazione, ferite e stato del disperso.', scale=0.8, wordwrap=45),
-
+            Text(text='Indica situazione, ferite e stato del disperso.', scale=0.9),
             state.input_description,
-            Space(height=0.5),
+            Space(height=0.70),
             Text(text='Turni di vita stimati (Reali):'),
             state.input_ttl,
-            Space(height=0.5),
             Button(text='Salva Descrizione', color=color.green, on_click=salva_descrizione)
         )
     )
+    extra=1.1
+    state.input_description.scale_y=1+extra
+    state.input_description.text_field.text_entity.world_scale = Vec3(20,20,1)
+    
+
+    new_text_scale = tf.text_entity.world_scale_x  # ora è 20
+    ratio = new_text_scale / old_text_scale
+
+    tf.cursor_parent.world_scale_x = old_cursor_scale_x * ratio
+    tf.cursor_parent.world_scale_y = old_cursor_scale_y * ratio
+
+    for element in state.panel_description.content[2:]:
+        if hasattr(element, 'y'):
+            element.y -= extra
+    state.panel_description.panel.scale_y += extra
+
+    
+    state.abilita_wordwrap(state.input_description, larghezza=27)
+
+
 
 def salva_descrizione():
     cell = state.dispersi[state.disperso_corrente_idx]
@@ -149,9 +172,9 @@ def salva_descrizione():
     state.disperso_corrente_idx += 1
     mostra_ui_descrizione()
 
-def inizia_posizionamento_agenti():
+def inizia_posizionamento_agenti_ospedale():
     for cell in state.grid_cells:
-        cell.on_click = Func(seleziona_posizione_agente, cell)
+        cell.on_click = Func(seleziona_posizione_agente_ospedale, cell)
     
     state.stato_posizionamento = 'DRONE'
 
@@ -160,7 +183,7 @@ def inizia_posizionamento_agenti():
         origin=(0,0), y=0.4, scale=1.5, color=color.cyan, background=True
     )
 
-def seleziona_posizione_agente(cell):
+def seleziona_posizione_agente_ospedale(cell):
     if state.error_text:
         destroy(state.error_text)
         state.error_text = None
@@ -169,6 +192,7 @@ def seleziona_posizione_agente(cell):
         state.start_drone_pos = (cell.grid_x, cell.grid_y)
         #cell.color = color.cyan
         cell.text = "D"
+
         state.stato_posizionamento = 'ROVER'
         state.testo_istruzioni.text = "Fase di deploy: \nClicca su una cella per posizionare il rover\n(Non può essere su una montagna o un disperso!)"
         state.testo_istruzioni.color = color.orange
@@ -181,15 +205,36 @@ def seleziona_posizione_agente(cell):
                 color=color.red, scale=1.2, origin=(0, 0), y=-0.4, background=True
             )
             return
+        
         state.start_rover_pos = (cell.grid_x, cell.grid_y)
+        cell.text ="R"
+        cell.color = color.orange
+
+        state.stato_posizionamento = 'OSPEDALE'
+        state.testo_istruzioni.text = "Posiziona ora l'ospedale:\n Il luogo dove verranno portati i dispersi una volta curati\n(Non può essere su una montagna o un disperso)"
+        state.testo_istruzioni.color = color.green
+        return
     
-    cell.color = color.orange
-    cell.text ="R"
+
+    elif state.stato_posizionamento == 'OSPEDALE':
+        if getattr(cell, 'is_obstacle', False) or getattr(cell, 'is_disperso', False):
+            state.error_text = Text(
+                text="L'ospedale non può essere posizionato su una montagna o un disperso!\nScegli una cella libera.",
+                color=color.red, scale=1.2, origin=(0, 0), y=-0.4, background=True
+            )
+            return
+        state.ospedale_posizione = (cell.grid_x, cell.grid_y)
+        cell.is_ospedale = True
+
+    cell.color = color.white
+    cell.texture="hospital.png"
     state.stato_posizionamento = None
-    state.testo_istruzioni.text = "Deploy completato! Avvio simulazione"
+    state.testo_istruzioni.text = "Deploy e posizionamento completato! Avvio simulazione"
     state.testo_istruzioni.color = color.green
 
     invoke(avvia_simulazione_3d, delay=0.5)
+
+
 
 def avvia_simulazione_3d():
     if state.testo_istruzioni:
@@ -225,6 +270,11 @@ def avvia_simulazione_3d():
             cell.color = color.hex('#7CFC00')
             cell.texture = 'grass.jpg'
             state.vittime_nascoste.append(cell)
+        
+        elif getattr(cell, 'is_ospedale', False):
+            cell.color=color.white
+            cell.texture= 'hospital.png'
+        
         else:
             cell.color = color.hex('#7CFC00')
             cell.texture = 'grass.jpg'
@@ -287,7 +337,7 @@ def avvia_simulazione_3d():
     state.pannello_log_testo = testo_log_interno
     
     # Inviamo il primo messaggio!
-    state.log_messaggio("[SISTEMA] Avvio simulazione 3D...")
+    print("[SISTEMA] Avvio simulazione 3D...")
 
     
     invoke(drone.esegui_piano_volo_drone, delay=1.0)

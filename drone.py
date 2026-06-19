@@ -120,7 +120,7 @@ def controlla_visione_drone():
                         thread.start()
 
 def chiama_llm_triage(cella_vittima, descrizione_visiva):
-    state.log_messaggio(f"\n[LLM] Connessione a Groq... Generazione dispaccio per la situazione: '{descrizione_visiva}'")
+    print(f"\n[LLM] Connessione a Groq... Generazione dispaccio per la situazione: '{descrizione_visiva}'")
     
     prompt_drone = f"""
     Sei un drone di ricognizione di un ambiente montano della protezione civile. 
@@ -159,4 +159,4 @@ def chiama_llm_triage(cella_vittima, descrizione_visiva):
                     rover.calcola_prossimo_percorso_rover()
 
     except Exception as e:
-        state.log_messaggio(f"[ERRORE RADIO] Comunicazione fallita: {e}")
+        print(f"[ERRORE RADIO] Comunicazione fallita: {e}")

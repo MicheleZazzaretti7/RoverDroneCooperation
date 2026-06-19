@@ -22,6 +22,7 @@ input_latitude = None
 stato_posizionamento = None
 start_drone_pos=(0,0)
 start_rover_pos= (0,0)
+ospedale_posizione=(0,0)
 turni_trascorsi = 0
 
 
@@ -70,3 +71,33 @@ def log_messaggio(testo):
     # Aggiorna il pannello grafico
     if pannello_log_testo:
         pannello_log_testo.text = "\n".join(registro_log)
+def abilita_wordwrap(input_field, larghezza=40):
+    tf = input_field.text_field
+    tf._wrapping = False  # guardia anti-ricorsione
+
+    def wrap():
+        if tf._wrapping:
+            return
+        y = int(tf.cursor.y)
+        lines = tf.text.split('\n')
+        if y >= len(lines) or len(lines[y]) <= larghezza:
+            return
+
+        riga = lines[y]
+        spazio = riga.rfind(' ', 0, larghezza)
+        if spazio == -1:
+            spazio = larghezza
+
+        sopra, sotto = riga[:spazio], riga[spazio:].lstrip(' ')
+        lines[y] = sopra
+        lines.insert(y + 1, sotto)
+
+        tf._wrapping = True
+        tf.text = '\n'.join(lines)
+        tf.cursor.y = y + 1
+        tf.cursor.x = len(sotto)
+        tf.render()
+        tf._wrapping = False
+
+    input_field.on_value_changed = wrap
+
