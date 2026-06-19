@@ -98,6 +98,10 @@ def abilita_wordwrap(input_field, larghezza=40):
         tf.cursor.x = len(sotto)
         tf.render()
         tf._wrapping = False
-
-    input_field.on_value_changed = wrap
+    
+    original_text_input = tf.text_input
+    def text_input_con_wrap(key):
+        original_text_input(key)
+        wrap()
+    tf.text_input = text_input_con_wrap
 

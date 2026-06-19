@@ -105,13 +105,13 @@ def mostra_ui_descrizione():
 
     state.input_description = InputField(
         default_value=f"Soggetto {state.disperso_corrente_idx+1}",
-        character_limit=150,
+        character_limit=170,
         max_lines=10,
         scale=(0.8, 0.12)
     )
 
     tf = state.input_description.text_field
-    old_text_scale = tf.text_entity.world_scale_x        # valore PRIMA che WindowPanel lo tocchi
+    old_text_scale = tf.text_entity.world_scale_x
     old_cursor_scale_x = tf.cursor_parent.world_scale_x
     old_cursor_scale_y = tf.cursor_parent.world_scale_y
     
@@ -119,21 +119,22 @@ def mostra_ui_descrizione():
         default_value="30",
         character_limit=2
     )
+    state.input_description.color = color.clear
 
 
     state.panel_description = WindowPanel(
         title=f'Disperso {state.disperso_corrente_idx+1}/{len(state.dispersi)} a ({cell.grid_x}, {cell.grid_y})',
         position=(0, 0.2),
         content=(
-            Text(text='Indica situazione, ferite e stato del disperso.', scale=0.9),
+            Text(text='Indica situazione, ferite e stato del disperso.', scale=0.8),
             state.input_description,
-            Space(height=0.70),
+            Space(height=0.80),
             Text(text='Turni di vita stimati (Reali):'),
             state.input_ttl,
             Button(text='Salva Descrizione', color=color.green, on_click=salva_descrizione)
         )
     )
-    extra=1.1
+    extra=1.2
     state.input_description.scale_y=1+extra
     state.input_description.text_field.text_entity.world_scale = Vec3(20,20,1)
     
@@ -143,7 +144,10 @@ def mostra_ui_descrizione():
 
     tf.cursor_parent.world_scale_x = old_cursor_scale_x * ratio
     tf.cursor_parent.world_scale_y = old_cursor_scale_y * ratio
-
+    for element in state.panel_description.content[:1]:
+        if hasattr(element, 'y'):
+            element.y += 0.6
+    
     for element in state.panel_description.content[2:]:
         if hasattr(element, 'y'):
             element.y -= extra
