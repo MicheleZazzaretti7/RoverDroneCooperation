@@ -83,7 +83,7 @@ def inserimento_descrizioni():
     state.descrizione_dispersi.clear()
 
     if not state.dispersi:
-        state.log_messaggio("[DEBUG] Lista dispersi vuota all'inserimento.")
+        print("[DEBUG] Lista dispersi vuota all'inserimento.")
         state.pannello_controlli.enabled = False
         return
     
@@ -107,9 +107,13 @@ def mostra_ui_descrizione():
         default_value=f"Soggetto {state.disperso_corrente_idx+1}",
         character_limit=150,
         max_lines=10,
-        scale=(0.8, 0.12),
-        #color=color.clear
-        )
+        scale=(0.8, 0.12)
+    )
+
+    tf = state.input_description.text_field
+    old_text_scale = tf.text_entity.world_scale_x        # valore PRIMA che WindowPanel lo tocchi
+    old_cursor_scale_x = tf.cursor_parent.world_scale_x
+    old_cursor_scale_y = tf.cursor_parent.world_scale_y
     
     state.input_ttl = InputField(
         default_value="30",
@@ -132,11 +136,20 @@ def mostra_ui_descrizione():
     extra=1.1
     state.input_description.scale_y=1+extra
     state.input_description.text_field.text_entity.world_scale = Vec3(20,20,1)
+    
+
+    new_text_scale = tf.text_entity.world_scale_x  # ora è 20
+    ratio = new_text_scale / old_text_scale
+
+    tf.cursor_parent.world_scale_x = old_cursor_scale_x * ratio
+    tf.cursor_parent.world_scale_y = old_cursor_scale_y * ratio
+
     for element in state.panel_description.content[2:]:
         if hasattr(element, 'y'):
             element.y -= extra
     state.panel_description.panel.scale_y += extra
 
+    
     state.abilita_wordwrap(state.input_description, larghezza=27)
 
 
@@ -324,7 +337,7 @@ def avvia_simulazione_3d():
     state.pannello_log_testo = testo_log_interno
     
     # Inviamo il primo messaggio!
-    state.log_messaggio("[SISTEMA] Avvio simulazione 3D...")
+    print("[SISTEMA] Avvio simulazione 3D...")
 
     
     invoke(drone.esegui_piano_volo_drone, delay=1.0)
