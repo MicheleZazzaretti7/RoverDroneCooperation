@@ -101,3 +101,7 @@ def abilita_wordwrap(input_field, larghezza=40):
 
     input_field.on_value_changed = wrap
 
+# --- SISTEMA DI TRASPORTO ROVER ---
+passeggeri_rover = []           # Lista delle vittime attualmente a bordo
+CAPACITA_MAX_ROVER = 3          # Limite massimo di trasporto
+in_viaggio_verso_ospedale = False # Flag di stato per il pathfinding

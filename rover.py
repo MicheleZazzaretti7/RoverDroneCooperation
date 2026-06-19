@@ -93,20 +93,33 @@ class RoverAgent:
         return nuova_coda_ordinata
 
 def calcola_prossimo_percorso_rover():
-    if not state.coda_obiettivi_rover:
-        state.rover_in_movimento = False
-        state.log_messaggio("[ROVER] Tutti gli obiettivi raggiunti. In attesa...")
-        return
+    # 1. Valutazione ritorno all'ospedale: ci vado se sono pieno (3 passeggeri) 
+    # OPPURE se ho salvato qualcuno e non ci sono altri allarmi in coda.
+    if len(state.passeggeri_rover) >= getattr(state, 'CAPACITA_MAX_ROVER', 3) or (len(state.passeggeri_rover) > 0 and not state.coda_obiettivi_rover):
+        state.rover_in_movimento = True
+        state.in_viaggio_verso_ospedale = True
+        obiettivo_attuale = getattr(state, 'ospedale_posizione', (0,0))
+        state.obiettivo_corrente = obiettivo_attuale
+        state.log_messaggio(f"[ROVER - MEDEVAC] Ritorno alla base! Direzione OSPEDALE {obiettivo_attuale} con {len(state.passeggeri_rover)} feriti a bordo.")
         
-    state.rover_in_movimento = True
-    # Adesso estraiamo sia le coordinate che la priorità
-    obiettivo_dati = state.coda_obiettivi_rover.pop(0)
-    obiettivo_attuale = obiettivo_dati[0] # Prende solo (X, Y)
-    priorita = obiettivo_dati[1]          # Prende la priorità (es. 'Alta')
-    
-    state.obiettivo_corrente = obiettivo_attuale # Salviamo nello state per esegui_passo_rover
-    state.log_messaggio(f"[ROVER] Dirigendosi a {obiettivo_attuale} (Priorità: {priorita})")
-    
+    # 2. Valutazione soccorso: ho allarmi in coda e spazio a bordo
+    elif state.coda_obiettivi_rover:
+        state.rover_in_movimento = True
+        state.in_viaggio_verso_ospedale = False
+        obiettivo_dati = state.coda_obiettivi_rover.pop(0)
+        obiettivo_attuale = obiettivo_dati[0] 
+        priorita = obiettivo_dati[1]          
+        
+        state.obiettivo_corrente = obiettivo_attuale
+        state.log_messaggio(f"[ROVER] Dirigendosi a {obiettivo_attuale} (Priorità: {priorita}). Spazio a bordo: {3 - len(state.passeggeri_rover)}")
+        
+    # 3. Nessun allarme e stiva vuota
+    else:
+        state.rover_in_movimento = False
+        state.log_messaggio("[ROVER] Tutti gli obiettivi raggiunti. Stiva vuota. In attesa...")
+        return
+
+    # Calcolo A*
     ostacoli = set((c.grid_x, c.grid_y) for c in state.grid_cells if getattr(c, 'is_obstacle', False))
     start_pos = (state.rover.grid_x, state.rover.grid_y)
     problema = GridNavigationProblem(start_pos, obiettivo_attuale, state.map_w, state.map_h, ostacoli)
@@ -117,20 +130,24 @@ def calcola_prossimo_percorso_rover():
         state.log_messaggio(f"  [A*] Rotta per {obiettivo_attuale} calcolata! Passi: {len(state.percorso_rover_corrente)}")
         esegui_passo_rover()
     else:
-        state.log_messaggio(f"  [A*] ERRORE: Nessuna rotta sicura per {obiettivo_attuale}. Salto bersaglio.")
-        calcola_prossimo_percorso_rover()
-
+        state.log_messaggio(f"  [A*] ERRORE GRAVE: Nessuna rotta per {obiettivo_attuale}.")
+        if not state.in_viaggio_verso_ospedale:
+            # Salta il bersaglio irragiungibile e riprova
+            calcola_prossimo_percorso_rover()
+        else:
+            # Se l'ospedale è irraggiungibile, fermati
+            state.rover_in_movimento = False
 def esegui_passo_rover():
     if not state.percorso_rover_corrente:
-        state.log_messaggio(f"[ROVER] Arrivato alla destinazione pianificata!")
-        for c in state.grid_cells:
-            if c.grid_x == state.rover.grid_x and c.grid_y == state.rover.grid_y and getattr(c, 'is_disperso', False):
-                if not getattr(c, 'morto', False) and not getattr(c, 'salvato', False):
-                    c.color = color.blue 
-                    c.text = "OK"
-                    c.salvato = True 
-                    state.log_messaggio(f"  [ROVER] Vittima in ({c.grid_x}, {c.grid_y}) salvata con successo!")
-        
+        # Se siamo arrivati alla destinazione finale del percorso attuale
+        if getattr(state, 'in_viaggio_verso_ospedale', False):
+            # Logica di scarico all'ospedale
+            state.log_messaggio(f"[OSPEDALE] Rover arrivato! Sbarco di {len(state.passeggeri_rover)} pazienti completato con successo.")
+            state.passeggeri_rover.clear() # Svuota il rover
+            state.in_viaggio_verso_ospedale = False
+        else:
+            state.log_messaggio(f"[ROVER] Raggiunta l'ultima posizione nota.")
+            
         invoke(calcola_prossimo_percorso_rover, delay=1.5)
         return
 
@@ -147,20 +164,27 @@ def esegui_passo_rover():
         avanza_tempo_globale()
        
     vittima_incontrata = False
+    
+    # Controllo interazioni con la cella corrente
     for c in state.grid_cells:
         if c.grid_x == nuovo_x and c.grid_y == nuovo_y and getattr(c, 'is_disperso', False):
             if not getattr(c, 'morto', False) and not getattr(c, 'salvato', False):
-                c.color = color.blue 
-                c.text = "OK"
-                c.salvato = True
-                vittima_incontrata = True
                 
-                # Controlla se è l'obiettivo principale o un incontro fortuito
-                if hasattr(state, 'obiettivo_corrente') and (nuovo_x, nuovo_y) == state.obiettivo_corrente:
-                    state.log_messaggio(f"\n[ROVER] Obiettivo raggiunto! Salvata vittima in ({nuovo_x}, {nuovo_y}).")
+                # Controlla se c'è spazio a bordo
+                if len(getattr(state, 'passeggeri_rover', [])) < getattr(state, 'CAPACITA_MAX_ROVER', 3):
+                    c.salvato = True
+                    c.enabled = False # Scompare dalla mappa 3D perché è dentro il Rover
+                    state.passeggeri_rover.append(c)
+                    vittima_incontrata = True
+                    
+                    if hasattr(state, 'obiettivo_corrente') and (nuovo_x, nuovo_y) == state.obiettivo_corrente:
+                        state.log_messaggio(f"\n[ROVER] Recuperato bersaglio in ({nuovo_x}, {nuovo_y}). Carico: {len(state.passeggeri_rover)}/3")
+                    else:
+                        state.log_messaggio(f"\n[ROVER] INCONTRO FORTUITO! Caricata vittima extra in ({nuovo_x}, {nuovo_y}). Carico: {len(state.passeggeri_rover)}/3")
+                        # Rimuovi l'incontro fortuito dalla coda per non tornarci inutilmente
+                        state.coda_obiettivi_rover = [ob for ob in state.coda_obiettivi_rover if ob[0] != (nuovo_x, nuovo_y)]
                 else:
-                    state.log_messaggio(f"\n[ROVER] INCONTRO FORTUITO! Salvata vittima non programmata in ({nuovo_x}, {nuovo_y})!")
-                    # Rimuove l'obiettivo raggiunto dalla coda filtrandolo
-                    state.coda_obiettivi_rover = [ob for ob in state.coda_obiettivi_rover if ob[0] != (nuovo_x, nuovo_y)]
+                    state.log_messaggio(f"\n[ROVER] Vittima in ({nuovo_x}, {nuovo_y}) trovata, ma il Rover è PIENO (3/3)! Tornerò dopo lo scarico.")
+
     ritardo_prossimo_passo = 1.5 if vittima_incontrata else 0.5
     invoke(esegui_passo_rover, delay=ritardo_prossimo_passo)
