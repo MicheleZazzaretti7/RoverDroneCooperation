@@ -9,7 +9,7 @@ from google import genai
 from state import log_messaggio
 
 load_dotenv()
-API_KEY_GEMINI = os.getenv("GEMINI_API_KEY2")
+API_KEY_GEMINI = os.getenv("GEMINI_API_KEY3")
 client_gemini = genai.Client(api_key=API_KEY_GEMINI) if API_KEY_GEMINI else genai.Client()
 
 class GridNavigationProblem(Problem):
@@ -142,8 +142,13 @@ def esegui_passo_rover():
         # Se siamo arrivati alla destinazione finale del percorso attuale
         if getattr(state, 'in_viaggio_verso_ospedale', False):
             # Logica di scarico all'ospedale
-            state.log_messaggio(f"[OSPEDALE] Rover arrivato! Sbarco di {len(state.passeggeri_rover)} pazienti completato con successo.")
+            state.log_messaggio(f"[OSPEDALE] Rover arrivato! Sbarco di {len(state.passeggeri_rover)} pazienti completato.")
             state.passeggeri_rover.clear() # Svuota il rover
+            
+            # AGGIORNA UI DOPO LO SCARICO
+            if state.testo_capienza_ui:
+                state.testo_capienza_ui.text = f"Capienza Rover: {len(state.passeggeri_rover)}/3"
+                
             state.in_viaggio_verso_ospedale = False
         else:
             state.log_messaggio(f"[ROVER] Raggiunta l'ultima posizione nota.")
@@ -173,18 +178,21 @@ def esegui_passo_rover():
                 # Controlla se c'è spazio a bordo
                 if len(getattr(state, 'passeggeri_rover', [])) < getattr(state, 'CAPACITA_MAX_ROVER', 3):
                     c.salvato = True
-                    c.enabled = False # Scompare dalla mappa 3D perché è dentro il Rover
+                    c.enabled = False # Scompare dalla mappa perché è dentro il Rover
                     state.passeggeri_rover.append(c)
                     vittima_incontrata = True
                     
-                    if hasattr(state, 'obiettivo_corrente') and (nuovo_x, nuovo_y) == state.obiettivo_corrente:
+                    # AGGIORNA UI DOPO IL CARICO
+                    if state.testo_capienza_ui:
+                        state.testo_capienza_ui.text = f"Capienza Rover: {len(state.passeggeri_rover)}/3"
+                    
+                    if hasattr(state, 'objective_corrente') and (nuovo_x, nuovo_y) == state.obiettivo_corrente:
                         state.log_messaggio(f"\n[ROVER] Recuperato bersaglio in ({nuovo_x}, {nuovo_y}). Carico: {len(state.passeggeri_rover)}/3")
                     else:
                         state.log_messaggio(f"\n[ROVER] INCONTRO FORTUITO! Caricata vittima extra in ({nuovo_x}, {nuovo_y}). Carico: {len(state.passeggeri_rover)}/3")
-                        # Rimuovi l'incontro fortuito dalla coda per non tornarci inutilmente
                         state.coda_obiettivi_rover = [ob for ob in state.coda_obiettivi_rover if ob[0] != (nuovo_x, nuovo_y)]
                 else:
-                    state.log_messaggio(f"\n[ROVER] Vittima in ({nuovo_x}, {nuovo_y}) trovata, ma il Rover è PIENO (3/3)! Tornerò dopo lo scarico.")
+                    state.log_messaggio(f"\n[ROVER] Vittima in ({nuovo_x}, {nuovo_y}) trovata, ma il Rover è PIENO (3/3)!")
 
     ritardo_prossimo_passo = 1.5 if vittima_incontrata else 0.5
     invoke(esegui_passo_rover, delay=ritardo_prossimo_passo)

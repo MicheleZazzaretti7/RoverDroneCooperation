@@ -35,5 +35,7 @@ state.pannello_controlli = WindowPanel(
     enabled=False
 )
 
+
+
 if __name__ == '__main__':
     app.run()

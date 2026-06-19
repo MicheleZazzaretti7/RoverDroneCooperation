@@ -336,6 +336,18 @@ def avvia_simulazione_3d():
     # Salviamo l'entità di testo nello stato
     state.pannello_log_testo = testo_log_interno
     
+    # Pannello di Stato del Rover (posizionato in alto a destra)
+    state.pannello_stato_rover = WindowPanel(
+        title='Stato Rover',
+        content=(
+            Text(text="Capienza Rover: 0/3", color=color.white),
+        ),
+        position=(0.6, 0.45) # Regola queste coordinate per spostarlo dove preferisci a destra
+    )
+
+    # Salviamo il riferimento al Text (che è il primo elemento del contenuto del pannello)
+    state.testo_capienza_ui = state.pannello_stato_rover.content[0]
+    
     # Inviamo il primo messaggio!
     print("[SISTEMA] Avvio simulazione 3D...")
 
