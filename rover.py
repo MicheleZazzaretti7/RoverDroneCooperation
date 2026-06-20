@@ -9,7 +9,7 @@ from google import genai
 from state import log_messaggio
 
 load_dotenv()
-API_KEY_GEMINI = os.getenv("GEMINI_API_KEY3")
+API_KEY_GEMINI = os.getenv("GEMINI_API_KEY1")
 client_gemini = genai.Client(api_key=API_KEY_GEMINI) if API_KEY_GEMINI else genai.Client()
 
 class GridNavigationProblem(Problem):

@@ -90,6 +90,8 @@ def esegui_piano_volo_drone():
     invoke(esegui_piano_volo_drone, delay=0.5)
 
 def controlla_visione_drone():
+    vittime_vive_trovate = []  # accumula tutte le vittime vive scoperte in QUESTO giro di scansione
+
     for dx in [-1, 0, 1]:
         for dy in [-1, 0, 1]:
             check_x = state.drone.grid_x + dx
@@ -115,46 +117,50 @@ def controlla_visione_drone():
                         disp.text = str(disp.ttl) 
                         disp.text_color = color.white
                         state.log_messaggio(f"\n[DRONE] Avvistato soggetto VIVO in ({check_x}, {check_y})!")
-                        
-                        thread = threading.Thread(target=chiama_llm_triage, args=(disp, getattr(disp, 'descrizione', 'Nessuna')))
-                        thread.start()
+                        vittime_vive_trovate.append(disp)
 
-def chiama_llm_triage(cella_vittima, descrizione_visiva):
-    print(f"\n[LLM] Connessione a Groq... Generazione dispaccio per la situazione: '{descrizione_visiva}'")
+    # Solo DOPO aver scandagliato l'intera visuale 3x3, valutiamo tutte le vittime vive trovate insieme
+    if vittime_vive_trovate:
+        thread = threading.Thread(target=chiama_llm_triage, args=(vittime_vive_trovate,))
+        thread.start()
+
+def chiama_llm_triage(lista_vittime):
+    descrizioni_str = "\n".join(
+        f"- Coordinate ({v.grid_x}, {v.grid_y}): \"{getattr(v, 'descrizione', 'Nessuna')}\""
+        for v in lista_vittime
+    )
+    print(f"\n[LLM] Connessione a Groq... Generazione dispaccio per {len(lista_vittime)} vittima/e.")
     
     prompt_drone = f"""
-    Sei un drone di ricognizione di un ambiente montano della protezione civile. 
-    Hai appena identificato un ferito alle coordinate X={cella_vittima.grid_x}, Y={cella_vittima.grid_y}. 
-    La sua descrizione visiva è: "{descrizione_visiva}".
-    Il tuo compito è inviare un singolo, breve messaggio radio (massimo 2 frasi) al Rover di recupero.
+    Sei un drone di ricognizione di un ambiente montano della protezione civile.
+    Hai appena identificato {len(lista_vittime)} ferito/i nella tua visuale, alle seguenti coordinate e con le seguenti descrizioni:
+    {descrizioni_str}
+
+    Il tuo compito è inviare UN SOLO messaggio radio al Rover di recupero che riporti TUTTE le vittime sopra elencate.
     Regole TASSATIVE:
-    1. Includi SEMPRE le coordinate nel messaggio.
-    2. Fai una valutazione della gravità della situazione in base a: {descrizione_visiva} 
-    3. Indica la priorità medica ("alta", "media" o "bassa") in base alla gravità valutata.
-    4. SE {descrizione_visiva} non descrive ferite o sintomi, Dichiara stato e priorità "sconosciuto" .
-    6. REGOLA D'ORO: Rispondi SOLO ed ESCLUSIVAMENTE con il testo del messaggio radio. NON aggiungere premesse (es. "Ecco il messaggio"), NON aggiungere saluti, NON aggiungere giustificazioni finali (es. "Ho scelto questo perché..."). Qualsiasi parola fuori dal messaggio radio farà fallire la missione.
+    1. Includi SEMPRE le coordinate di OGNI vittima elencata.
+    2. Valuta la gravità di CIASCUNA vittima singolarmente, in base alla sua descrizione.
+    3. Indica per ognuna la priorità medica ("alta", "media" o "bassa") in base alla gravità valutata.
+    4. Se non esiste una descrizione, non inventare nulla e scrivi "Stato sconosciuto".
+    5. REGOLA D'ORO: Rispondi SOLO ed ESCLUSIVAMENTE con il testo del messaggio radio, una frase breve per vittima. NON aggiungere premesse, saluti o giustificazioni finali. Qualsiasi parola fuori dal messaggio radio farà fallire la missione.
     """
-    
-    #     5. Non menzionare numeri temporali.
+
     try:
         risposta = client_llm.chat.completions.create(
             messages=[{"role": "user", "content": prompt_drone}],
             model="llama-3.1-8b-instant"
         )
         messaggio_radio = risposta.choices[0].message.content.strip()
-        state.log_messaggio(f"\n [DISPACCIO DRONE-TO-ROVER] Da coord({cella_vittima.grid_x}, {cella_vittima.grid_y}):\n«{messaggio_radio}»")
-              
+        coordinate_str = ", ".join(f"({v.grid_x},{v.grid_y})" for v in lista_vittime)
+        state.log_messaggio(f"\n [DISPACCIO DRONE-TO-ROVER] Avvistamento {coordinate_str}:\n«{messaggio_radio}»")
+
         if state.rover_agent_instance:
-            # L'LLM ora restituisce la lista MASTER già completa e ordinata
             nuova_coda_completa = state.rover_agent_instance.receive_and_execute_mission(messaggio_radio)
-            
+
             if nuova_coda_completa:
-                # Sovrascriviamo in blocco la coda in Python
                 state.coda_obiettivi_rover = nuova_coda_completa
-                        
                 state.log_messaggio(f"[SISTEMA] Nuova rotta operativa: {state.coda_obiettivi_rover}")
-                
-                # Se il rover era fermo, lo facciamo partire
+
                 if not state.rover_in_movimento and state.coda_obiettivi_rover:
                     rover.calcola_prossimo_percorso_rover()
 
