@@ -98,12 +98,18 @@ def abilita_wordwrap(input_field, larghezza=40):
         tf.cursor.x = len(sotto)
         tf.render()
         tf._wrapping = False
-
-    input_field.on_value_changed = wrap
+    
+    original_text_input = tf.text_input
+    def text_input_con_wrap(key):
+        original_text_input(key)
+        wrap()
+    tf.text_input = text_input_con_wrap
 
 # --- SISTEMA DI TRASPORTO ROVER ---
 passeggeri_rover = []           # Lista delle vittime attualmente a bordo
 CAPACITA_MAX_ROVER = 3          # Limite massimo di trasporto
 in_viaggio_verso_ospedale = False # Flag di stato per il pathfinding
 testo_capienza_ui = None        # Riferimento all'elemento grafico del testo
+
+
 

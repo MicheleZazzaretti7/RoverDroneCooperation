@@ -57,7 +57,7 @@ def esegui_piano_volo_drone():
             nodo_soluzione = breadth_first_graph_search(problema_drone)
             if nodo_soluzione:
                 state.piano_volo_drone = nodo_soluzione.solution() 
-                state.log_messaggio(f"[NAVIGAZIONE] Nuovo Waypoint: {obiettivo}. Rotta: {state.piano_volo_drone}")
+                print(f"[NAVIGAZIONE] Nuovo Waypoint: {obiettivo}. Rotta: {state.piano_volo_drone}")
 
     if state.piano_volo_drone:
         prossima_mossa = state.piano_volo_drone.pop(0)
@@ -130,8 +130,9 @@ def chiama_llm_triage(cella_vittima, descrizione_visiva):
     Regole TASSATIVE:
     1. Includi SEMPRE le coordinate nel messaggio.
     2. Fai una valutazione della gravità della situazione in base a: {descrizione_visiva} 
-    3. Indica la priorità medica ("alta", "media" o "bassa") in base alla gravità valutata. 
-    5. REGOLA D'ORO: Rispondi SOLO ed ESCLUSIVAMENTE con il testo del messaggio radio. NON aggiungere premesse (es. "Ecco il messaggio"), NON aggiungere saluti, NON aggiungere giustificazioni finali (es. "Ho scelto questo perché..."). Qualsiasi parola fuori dal messaggio radio farà fallire la missione. Dai solo una brevisssima descrizione della situazione e la priorità, senza spiegare il motivo della tua valutazione. Esempio di messaggio radio corretto: "Rilevato ferito a (3,5). Condizioni critiche, priorità alta."spiegazione di due/ tre parole sulla tua scelta
+    3. Indica la priorità medica ("alta", "media" o "bassa") in base alla gravità valutata.
+    4. SE {descrizione_visiva} non descrive ferite o sintomi, Dichiara stato e priorità "sconosciuto" .
+    6. REGOLA D'ORO: Rispondi SOLO ed ESCLUSIVAMENTE con il testo del messaggio radio. NON aggiungere premesse (es. "Ecco il messaggio"), NON aggiungere saluti, NON aggiungere giustificazioni finali (es. "Ho scelto questo perché..."). Qualsiasi parola fuori dal messaggio radio farà fallire la missione.
     """
     
     #     5. Non menzionare numeri temporali.
