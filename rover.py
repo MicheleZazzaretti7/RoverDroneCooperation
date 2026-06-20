@@ -107,7 +107,7 @@ def calcola_prossimo_percorso_rover():
         state.in_viaggio_verso_ospedale = True
         obiettivo_attuale = getattr(state, 'ospedale_posizione', (0,0))
         state.obiettivo_corrente = obiettivo_attuale
-        state.log_messaggio(f"[ROVER - MEDEVAC] Ritorno alla base! Direzione OSPEDALE {obiettivo_attuale} con {len(state.passeggeri_rover)} feriti a bordo.")
+        state.log_messaggio(f"[ROVER] Ritorno alla base! Direzione OSPEDALE {obiettivo_attuale} con {len(state.passeggeri_rover)} feriti a bordo.")
         
     # 2. Valutazione soccorso: ho allarmi in coda e spazio a bordo
     elif state.coda_obiettivi_rover:
