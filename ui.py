@@ -330,18 +330,49 @@ def avvia_simulazione_3d():
         position=(-0.55, 0.45) # Centrato rispetto allo sfondo
     )
 
-    # 3. Il testo dinamico vero e proprio
+    # 3. Il testo dinamico vero e proprio (Rimosso color=color.yellow per far funzionare i tag di stato)
     testo_log_interno = Text(
         parent=camera.ui,
         text="",
         scale=(0.9, 1.5),
-        color=color.yellow,
-        origin=(-0.5, 0.5),      # Allineato in alto a sinistra
-        position=(-0.80, 0.42)   # Posizionato dentro lo sfondo scuro
+        origin=(-0.5, 0.5),      
+        position=(-0.80, 0.42)   
     )
-    
-    # Salviamo l'entità di testo nello stato
     state.pannello_log_testo = testo_log_interno
+
+    # 4. Creazione della Scrollbar (Slider verticale)
+    def on_slider_changed():
+        max_scroll = max(0, len(state.registro_log_completo) - state.max_righe_console)
+        if max_scroll > 0:
+            # Gli slider verticali Ursina hanno lo 0 in basso e il max in alto.
+            # Invertiamo il valore in modo che lo 0 (in basso) mostri i log più recenti (max_scroll).
+            nuovo_offset = int(max_scroll - state.slider_console.value)
+            state.scroll_offset_console = nuovo_offset
+            
+            # Se l'utente scorre in alto per rileggere la cronologia, disattiviamo l'autoscroll
+            state.auto_scroll_console = (nuovo_offset == max_scroll)
+            state.aggiorna_vista_console()
+
+    state.slider_console = Slider(
+        parent=camera.ui,
+        min=0, max=0, default=0,
+        step=1,
+        dynamic=True,
+        orientation='vertical',
+        position=(-0.26, 0.05), # Fissato sul bordo destro dello sfondo della console
+        scale=(0.04, 0.75),
+        on_value_changed=on_slider_changed
+    )
+    state.slider_console.knob.color = color.light_gray
+    state.slider_console.bg.color = color.dark_gray
+
+    # Aggiunge il supporto rapido alla rotellina del mouse per la console
+    def scroll_mouse(key):
+        if key == 'scroll up':
+            state.slider_console.value = min(state.slider_console.max, state.slider_console.value + 1)
+        elif key == 'scroll down':
+            state.slider_console.value = max(0, state.slider_console.value - 1)
+    state.slider_console.input = scroll_mouse
 
         
     # Pannello di Stato del Rover (posizionato in alto a destra)
