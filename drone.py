@@ -98,11 +98,20 @@ def controlla_visione_drone():
             check_y = state.drone.grid_y + dy
             
             for disp in state.vittime_attive[:]: 
+                # ESCLUSIONE: salta le vittime ancora nascoste (non spawned)
+                if disp in state.vittime_nascoste:
+                    continue
+                    
                 if disp.grid_x == check_x and disp.grid_y == check_y:
                     if getattr(disp, 'salvato', False):
                         state.vittime_attive.remove(disp)
                         continue 
                     
+                    # Salta se già scoperta (per evitare rielaborazione)
+                    if getattr(disp, 'scoperto', False):
+                        continue
+                    
+                    # Processa la vittima (prima volta che la vede)
                     state.vittime_attive.remove(disp)
                     state.vittime_scoperte.append(disp)
                     disp.scoperto = True
@@ -119,7 +128,7 @@ def controlla_visione_drone():
                         state.log_messaggio(f"\n[DRONE] Avvistato soggetto VIVO in ({check_x}, {check_y})!")
                         vittime_vive_trovate.append(disp)
 
-    # Solo DOPO aver scandagliato l'intera visuale 3x3, valutiamo tutte le vittime vive trovate insieme
+    # Solo DOPO aver scandagliato l'intera visuale 3x3, valutiamo TUTTE le vittime vive trovate insieme in UN'UNICA CHIAMATA LLM
     if vittime_vive_trovate:
         thread = threading.Thread(target=chiama_llm_triage, args=(vittime_vive_trovate,))
         thread.start()
@@ -141,8 +150,7 @@ def chiama_llm_triage(lista_vittime):
     1. Includi SEMPRE le coordinate di OGNI vittima elencata.
     2. Valuta la gravità di CIASCUNA vittima singolarmente, in base alla sua descrizione.
     3. Indica per ognuna la priorità medica ("alta", "media" o "bassa") in base alla gravità valutata.
-    4. Se non esiste una descrizione, non inventare nulla e scrivi "Stato sconosciuto".
-    5. REGOLA D'ORO: Rispondi SOLO ed ESCLUSIVAMENTE con il testo del messaggio radio, una frase breve per vittima. NON aggiungere premesse, saluti o giustificazioni finali. Qualsiasi parola fuori dal messaggio radio farà fallire la missione.
+    4. REGOLA D'ORO: Rispondi SOLO ed ESCLUSIVAMENTE con il testo del messaggio radio, una frase breve per vittima. NON aggiungere premesse, saluti o giustificazioni finali. Qualsiasi parola fuori dal messaggio radio farà fallire la missione.
     """
 
     try:

@@ -55,18 +55,25 @@ class RoverAgent:
         prompt = f"""
         Sei il sistema di comunicazione di un Rover di soccorso che comunica con un drone di ricognizione in ambiente montano della protezione civile. 
         Posizione attuale del Rover: {current_rover_pos}.
-        Obiettivi attuali in attesa in ordine di priorità: {coda_str}
+        Obiettivi attuali in attesa: {coda_str}
         
         Hai appena ricevuto questo nuovo dispaccio radio: "{text_message}"
         
-        IL TUO COMPITO:
-        1. Estrai le nuove coordinate dal dispaccio radio e identifica la priorità medica indicata.
-        2. Concatena il nuovo obiettivo agli "Obiettivi attuali in attesa" riordinandoli rispetto alla priorità assegnatagli.  la scala di priorità è "Alta > Media > Bassa".
-        3. A parità di priorità, metti per primo l'obiettivo più vicino al Rover.
+        IL TUO COMPITO (OBBLIGATORIO):
+        1. Estrai le nuove coordinate dal dispaccio radio e la priorità medica di OGNI vittima menzionata.
+        2. Unisci tutte le vittime (quelle attuali + quelle nuove appena ricevute).
+        3. ORDINA TUTTE le vittime per priorità medica DECRESCENTE:
+           - PRIMA: Alta (massima urgenza)
+           - DOPO: Media
+           - ULTIMO: Bassa (minima urgenza)
+        4. A PARITÀ di priorità, ordina per distanza dal Rover (più vicina per prima).
         
-        RISPOSTA TASSATIVA:
-        Rispondi SOLO con la lista completa e aggiornata, una per riga nel formato esatto: X, Y, Priorità.
-        Non aggiungere testo, commenti o altro.
+        SCALA DI PRIORITÀ OBBLIGATORIA: Alta > Media > Bassa
+        ORDINAMENTO OBBLIGATORIO: Alta viene SEMPRE prima di Media, Media viene SEMPRE prima di Bassa
+        
+        RISPOSTA TASSATIVA - NON AGGIUNGERE NULLA:
+        Rispondi ESCLUSIVAMENTE con la lista completa ORDINATA (niente altro), una per riga nel formato esatto: 
+        X, Y, Priorità
         """
         response = self.client.models.generate_content(model=self.model_name, contents=prompt)
         text_output = response.text.strip()
