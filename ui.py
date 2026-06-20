@@ -317,7 +317,8 @@ def avvia_simulazione_3d():
         color=color.rgba(0, 0, 0, 200),  # Nero con opacità
         scale=(0.55, 0.80),              # Larghezza, Altezza
         position=(-0.55, 0.25),         # Posizionato in alto a sinistra
-        z=1
+        z=1,
+        collider='box'
     )
     
     # 2. Titolo fisso della console
@@ -366,15 +367,34 @@ def avvia_simulazione_3d():
     state.slider_console.knob.color = color.light_gray
     state.slider_console.bg.color = color.dark_gray
 
-    # Aggiunge il supporto rapido alla rotellina del mouse per la console
+    # Elementi che compongono la UI della console
+    elementi_console = [
+        sfondo_console, 
+        state.slider_console, 
+        getattr(state.slider_console, 'bg', None), 
+        getattr(state.slider_console, 'knob', None)
+    ]
+
+    # 4. Modifichiamo l'input per scorrere la console SOLO se il mouse è sopra di essa
     def scroll_mouse(key):
-        if key == 'scroll up':
-            state.slider_console.value = min(state.slider_console.max, state.slider_console.value + 1)
-        elif key == 'scroll down':
-            state.slider_console.value = max(0, state.slider_console.value - 1)
+        if mouse.hovered_entity in elementi_console:
+            if key == 'scroll up':
+                state.slider_console.value = min(state.slider_console.max, state.slider_console.value + 1)
+            elif key == 'scroll down':
+                state.slider_console.value = max(0, state.slider_console.value - 1)
+                
     state.slider_console.input = scroll_mouse
 
-        
+    # 5. Blocchiamo i comandi dell'EditorCamera se il mouse è sulla console
+    def blocca_zoom_camera():
+        if mouse.hovered_entity in elementi_console:
+            camera_editor.ignore = True  # Disabilita zoom e rotazione della mappa
+        else:
+            camera_editor.ignore = False # Riabilita i controlli della mappa
+
+    # Assegniamo la funzione di blocco all'update dello sfondo, così viene controllata costantemente
+    sfondo_console.update = blocca_zoom_camera
+    
     # Pannello di Stato del Rover (posizionato in alto a destra)
     state.pannello_stato_rover = WindowPanel(
         title='Stato Rover',
@@ -387,6 +407,7 @@ def avvia_simulazione_3d():
     # Salviamo il riferimento al Text (che è il primo elemento del contenuto del pannello)
     state.testo_capienza_ui = state.pannello_stato_rover.content[0]
     
+
     # Inviamo il primo messaggio!
     print("[SISTEMA] Avvio simulazione 3D...")
 
