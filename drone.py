@@ -57,7 +57,7 @@ def esegui_piano_volo_drone():
             nodo_soluzione = breadth_first_graph_search(problema_drone)
             if nodo_soluzione:
                 state.piano_volo_drone = nodo_soluzione.solution() 
-                state.log_messaggio(f"[NAVIGAZIONE] Nuovo Waypoint: {obiettivo}. Rotta: {state.piano_volo_drone}")
+                print(f"[NAVIGAZIONE] Nuovo Waypoint: {obiettivo}. Rotta: {state.piano_volo_drone}")
 
     if state.piano_volo_drone:
         prossima_mossa = state.piano_volo_drone.pop(0)

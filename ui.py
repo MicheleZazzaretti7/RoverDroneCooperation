@@ -79,6 +79,8 @@ def conferma_mappa():
     inserimento_descrizioni()
 
 def inserimento_descrizioni():
+    for cell in state.grid_cells:
+        cell.on_click = lambda: None
     state.dispersi = [c for c in state.grid_cells if getattr(c, 'is_disperso', False)]
     state.descrizione_dispersi.clear()
 
@@ -284,7 +286,8 @@ def avvia_simulazione_3d():
             cell.texture = 'grass.jpg'
 
     camera.orthographic = False
-    EditorCamera()
+    camera_editor =EditorCamera()
+    camera_editor.position=(-2.5,0,-100)
     
     offset_x = (state.map_w - 1) / 2
     offset_y = (state.map_h - 1) / 2
@@ -312,8 +315,8 @@ def avvia_simulazione_3d():
         parent=camera.ui,
         model='quad',
         color=color.rgba(0, 0, 0, 200),  # Nero con opacità
-        scale=(0.45, 0.45),              # Larghezza, Altezza
-        position=(-0.60, 0.25),         # Posizionato in alto a sinistra
+        scale=(0.55, 0.80),              # Larghezza, Altezza
+        position=(-0.55, 0.25),         # Posizionato in alto a sinistra
         z=1
     )
     
@@ -324,21 +327,34 @@ def avvia_simulazione_3d():
         color=color.cyan,
         scale=1.1,
         origin=(0, 0),
-        position=(-0.60, 0.45) # Centrato rispetto allo sfondo
+        position=(-0.55, 0.45) # Centrato rispetto allo sfondo
     )
 
     # 3. Il testo dinamico vero e proprio
     testo_log_interno = Text(
         parent=camera.ui,
         text="",
-        scale=0.9,
+        scale=(0.9, 1.5),
         color=color.yellow,
         origin=(-0.5, 0.5),      # Allineato in alto a sinistra
-        position=(-0.85, 0.42)   # Posizionato dentro lo sfondo scuro
+        position=(-0.80, 0.42)   # Posizionato dentro lo sfondo scuro
     )
     
     # Salviamo l'entità di testo nello stato
     state.pannello_log_testo = testo_log_interno
+
+        
+    # Pannello di Stato del Rover (posizionato in alto a destra)
+    state.pannello_stato_rover = WindowPanel(
+        title='Stato Rover',
+        content=(
+            Text(text="Capienza Rover: 0/3", color=color.white),
+        ),
+        position=(0.6, 0.45) # Regola queste coordinate per spostarlo dove preferisci a destra
+    )
+
+    # Salviamo il riferimento al Text (che è il primo elemento del contenuto del pannello)
+    state.testo_capienza_ui = state.pannello_stato_rover.content[0]
     
     # Inviamo il primo messaggio!
     print("[SISTEMA] Avvio simulazione 3D...")
