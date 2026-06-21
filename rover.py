@@ -3,13 +3,17 @@ from aima import *
 import re
 import os
 import state
+import threading
 from simulation import avanza_tempo_globale
 from dotenv import load_dotenv
 from google import genai
 from state import log_messaggio
 
+mission_lock = threading.Lock()
+
+
 load_dotenv()
-API_KEY_GEMINI = os.getenv("GEMINI_API_KEY2")
+API_KEY_GEMINI = os.getenv("GEMINI_API_KEY1")
 client_gemini = genai.Client(api_key=API_KEY_GEMINI) if API_KEY_GEMINI else genai.Client()
 
 class GridNavigationProblem(Problem):
@@ -46,6 +50,17 @@ class RoverAgent:
         self.client = client_gemini  
         self.model_name = 'gemini-2.5-flash-lite' 
 
+    def _filtra_coordinate_valide(self, lista_goal):
+        """Scarta eventuali coordinate inventate dall'LLM che non corrispondono a vittime realmente scoperte."""
+        coordinate_reali = {(v.grid_x, v.grid_y) for v in state.vittime_scoperte}
+        validi = []
+        for (x, y), priorita in lista_goal:
+            if (x, y) in coordinate_reali:
+                validi.append(((x, y), priorita))
+            else:
+                print(f"[ROVER - SCARTO] Coordinate ({x},{y}) non corrispondono a nessuna vittima nota: scartate.")
+        return validi
+
     def _extract_goals_with_llm(self, text_message, coda_attuale):
         current_rover_pos = self.position 
         
@@ -55,18 +70,25 @@ class RoverAgent:
         prompt = f"""
         Sei il sistema di comunicazione di un Rover di soccorso che comunica con un drone di ricognizione in ambiente montano della protezione civile. 
         Posizione attuale del Rover: {current_rover_pos}.
-        Obiettivi attuali in attesa in ordine di priorità: {coda_str}
+        Obiettivi attuali in attesa: {coda_str}
         
         Hai appena ricevuto questo nuovo dispaccio radio: "{text_message}"
         
-        IL TUO COMPITO:
-        1. Estrai le nuove coordinate dal dispaccio radio e identifica la priorità medica indicata.
-        2. Concatena il nuovo obiettivo agli "Obiettivi attuali in attesa" riordinandoli rispetto alla priorità assegnatagli.  la scala di priorità è "Alta > Media > Bassa".
-        3. A parità di priorità, metti per primo l'obiettivo più vicino al Rover.
+        IL TUO COMPITO (OBBLIGATORIO):
+        1. Estrai le nuove coordinate dal dispaccio radio e la priorità medica di OGNI vittima menzionata.
+        2. Unisci tutte le vittime (quelle attuali + quelle nuove appena ricevute).
+        3. ORDINA TUTTE le vittime per priorità medica DECRESCENTE:
+           - PRIMA: Alta (massima urgenza)
+           - DOPO: Media
+           - ULTIMO: Bassa (minima urgenza)
+        4. A PARITÀ di priorità, ordina per distanza dal Rover (più vicina per prima).
         
-        RISPOSTA TASSATIVA:
-        Rispondi SOLO con la lista completa e aggiornata, una per riga nel formato esatto: X, Y, Priorità.
-        Non aggiungere testo, commenti o altro.
+        SCALA DI PRIORITÀ OBBLIGATORIA: Alta > Media > Bassa
+        ORDINAMENTO OBBLIGATORIO: Alta viene SEMPRE prima di Media, Media viene SEMPRE prima di Bassa
+        
+        RISPOSTA TASSATIVA - NON AGGIUNGERE NULLA:
+        Rispondi ESCLUSIVAMENTE con la lista completa ORDINATA (niente altro), una per riga nel formato esatto: 
+        X, Y, Priorità
         """
         response = self.client.models.generate_content(model=self.model_name, contents=prompt)
         text_output = response.text.strip()
@@ -81,6 +103,7 @@ class RoverAgent:
                 priorita = match.group(3).capitalize()
                 extracted_goals.append(((x, y), priorita))
                 
+        extracted_goals = self._filtra_coordinate_valide(extracted_goals)
         return extracted_goals
     
     def receive_and_execute_mission(self, drone_message):

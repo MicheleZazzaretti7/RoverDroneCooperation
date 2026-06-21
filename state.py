@@ -43,34 +43,63 @@ coda_obiettivi_rover = []
 percorso_rover_corrente = []
 
 # --- SISTEMA DI LOG A SCHERMO ---
-registro_log = []          # Conterrà le ultime righe di testo inviate
-pannello_log_testo = None  # L'entità Text di Ursina che mostrerà i log
+registro_log_completo = [] # Mantiene l'intera cronologia dei log
+pannello_log_testo = None  
+slider_console = None      # Riferimento alla scrollbar grafica
+
+max_righe_console = 14
+scroll_offset_console = 0
+auto_scroll_console = True # Scorre in basso in automatico all'arrivo di nuovi log
+
+def aggiorna_vista_console():
+    """Aggiorna il testo mostrato in base alla posizione della scrollbar."""
+    if pannello_log_testo:
+        inizio = scroll_offset_console
+        fine = scroll_offset_console + max_righe_console
+        righe_visibili = registro_log_completo[inizio:fine]
+        pannello_log_testo.text = "\n".join(righe_visibili)
+    
+    if slider_console:
+        max_scroll = max(0, len(registro_log_completo) - max_righe_console)
+        slider_console.max = max_scroll
+        # Se siamo in autoscroll, manteniamo forzatamente lo slider in basso (valore 0)
+        if auto_scroll_console and slider_console.value != 0:
+            slider_console.value = 0
 
 def log_messaggio(testo):
-    """Stampa in console e aggiorna il pannello 3D andando a capo automaticamente."""
-    print(testo)  # Mantiene la stampa standard nel terminale per debug
+    """Stampa in console, colora il testo tramite tag e lo aggiunge allo storico."""
+    global scroll_offset_console, auto_scroll_console
+    print(testo) 
 
-    # Definisci quanti caratteri al massimo deve contenere una riga prima di andare a capo
     LARGHEZZA_MASSIMA_RIGA = 45 
-
-    # Separiamo prima il testo se ci sono già dei vado a capo (\n) manuali
     righe_originali = testo.strip().split('\n')
     
+    # 1. Riconoscimento del mittente e assegnazione tag di colore Ursina
+    colore_tag = "<white>"
+    if "[DRONE]" in testo or "[DISPACCIO DRONE" in testo:
+        colore_tag = "<cyan>"
+    elif "[ROVER]" in testo or "[A*]" in testo:
+        colore_tag = "<orange>"
+    elif "[SISTEMA]" in testo or "[OSPEDALE]" in testo:
+        colore_tag = "<green>"
+    elif "[TRAGEDIA]" in testo or "ERRORE" in testo:
+        colore_tag = "<red>"
+
+    # 2. Spezza le righe e inserisci nello storico
     for riga in righe_originali:
         if riga.strip():
-            # textwrap.wrap spezza la riga in una lista di righe più corte senza tagliare le parole
             righe_formattate = textwrap.wrap(riga, width=LARGHEZZA_MASSIMA_RIGA)
             for riga_wrap in righe_formattate:
-                registro_log.append(riga_wrap)
+                # Il tag <default> a fine stringa resetta il colore
+                registro_log_completo.append(f"{colore_tag}{riga_wrap}<default>")
 
-    # Dato che ora andiamo a capo più spesso, aumentiamo il numero di righe 
-    # visibili a schermo (es. ultime 14 righe invece di 10)
-    while len(registro_log) > 14:
-        registro_log.pop(0)
+    # 3. Gestione autoscroll
+    max_scroll = max(0, len(registro_log_completo) - max_righe_console)
+    if auto_scroll_console:
+        scroll_offset_console = max_scroll
 
-    # Aggiorna il pannello grafico
-    if pannello_log_testo:
-        pannello_log_testo.text = "\n".join(registro_log)
+    aggiorna_vista_console()
+    
 def abilita_wordwrap(input_field, larghezza=40):
     tf = input_field.text_field
     tf._wrapping = False  # guardia anti-ricorsione

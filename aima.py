@@ -267,8 +267,8 @@ def breadth_first_graph_search(problem):
         for child in node.expand(problem):
             if child.state not in explored and child not in frontier:
                 if problem.goal_test(child.state):
-                    print("Examined",conta,"nodes")
-                    print(len(explored), "paths have been expanded and", len(frontier), "paths remain in the frontier")
+                    #print("Examined",conta,"nodes")
+                    #print(len(explored), "paths have been expanded and", len(frontier), "paths remain in the frontier")
                     return child
                 frontier.append(child)
     return None

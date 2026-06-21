@@ -240,8 +240,6 @@ def seleziona_posizione_agente_ospedale(cell):
 
     invoke(avvia_simulazione_3d, delay=0.5)
 
-
-
 def avvia_simulazione_3d():
     if state.testo_istruzioni:
         destroy(state.testo_istruzioni)
@@ -317,7 +315,8 @@ def avvia_simulazione_3d():
         color=color.rgba(0, 0, 0, 200),  # Nero con opacità
         scale=(0.55, 0.80),              # Larghezza, Altezza
         position=(-0.55, 0.25),         # Posizionato in alto a sinistra
-        z=1
+        z=1,
+        collider='box'
     )
     
     # 2. Titolo fisso della console
@@ -335,7 +334,6 @@ def avvia_simulazione_3d():
         parent=camera.ui,
         text="",
         scale=(0.9, 1.5),
-        color=color.yellow,
         origin=(-0.5, 0.5),      # Allineato in alto a sinistra
         position=(-0.80, 0.42)   # Posizionato dentro lo sfondo scuro
     )
@@ -343,7 +341,60 @@ def avvia_simulazione_3d():
     # Salviamo l'entità di testo nello stato
     state.pannello_log_testo = testo_log_interno
 
-        
+    # 4. Creazione della Scrollbar (Slider verticale)
+    def on_slider_changed():
+        max_scroll = max(0, len(state.registro_log_completo) - state.max_righe_console)
+        if max_scroll > 0:
+            # Gli slider verticali Ursina hanno lo 0 in basso e il max in alto.
+            # Invertiamo il valore in modo che lo 0 (in basso) mostri i log più recenti (max_scroll).
+            nuovo_offset = int(max_scroll - state.slider_console.value)
+            state.scroll_offset_console = nuovo_offset
+            
+            # Se l'utente scorre in alto per rileggere la cronologia, disattiviamo l'autoscroll
+            state.auto_scroll_console = (nuovo_offset == max_scroll)
+            state.aggiorna_vista_console()
+
+    state.slider_console = Slider(
+        parent=camera.ui,
+        min=0, max=0, default=0,
+        step=1,
+        dynamic=True,
+        orientation='vertical',
+        position=(-0.26, 0.05), # Fissato sul bordo destro dello sfondo della console
+        scale=(0.04, 0.75),
+        on_value_changed=on_slider_changed
+    )
+    state.slider_console.knob.color = color.light_gray
+    state.slider_console.bg.color = color.dark_gray
+
+    elementi_console = [
+        sfondo_console, 
+        state.slider_console, 
+        getattr(state.slider_console, 'bg', None), 
+        getattr(state.slider_console, 'knob', None)
+    ]
+
+    # 4. Modifichiamo l'input per scorrere la console SOLO se il mouse è sopra di essa
+    def scroll_mouse(key):
+        if mouse.hovered_entity in elementi_console:
+            if key == 'scroll up':
+                state.slider_console.value = min(state.slider_console.max, state.slider_console.value + 1)
+            elif key == 'scroll down':
+                state.slider_console.value = max(0, state.slider_console.value - 1)
+                
+
+    state.slider_console.input = scroll_mouse
+
+        # 5. Blocchiamo i comandi dell'EditorCamera se il mouse è sulla console
+    def blocca_zoom_camera():
+        if mouse.hovered_entity in elementi_console:
+            camera_editor.ignore = True  # Disabilita zoom e rotazione della mappa
+        else:
+            camera_editor.ignore = False # Riabilita i controlli della mappa
+
+    # Assegniamo la funzione di blocco all'update dello sfondo, così viene controllata costantemente
+    sfondo_console.update = blocca_zoom_camera
+
     # Pannello di Stato del Rover (posizionato in alto a destra)
     state.pannello_stato_rover = WindowPanel(
         title='Stato Rover',
@@ -359,6 +410,5 @@ def avvia_simulazione_3d():
     # Inviamo il primo messaggio!
     print("[SISTEMA] Avvio simulazione 3D...")
 
-    
     invoke(drone.esegui_piano_volo_drone, delay=1.0)
 
