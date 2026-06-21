@@ -13,8 +13,13 @@ mission_lock = threading.Lock()
 
 
 load_dotenv()
-API_KEY_GEMINI = os.getenv("GEMINI_API_KEY1")
-client_gemini = genai.Client(api_key=API_KEY_GEMINI) if API_KEY_GEMINI else genai.Client()
+API_KEYS_GEMINI = [os.getenv(f"GEMINI_API_KEY{i}") for i in range(1,4)]
+
+idx_current_key =0
+if API_KEYS_GEMINI:
+    client_gemini = genai.Client(api_key=API_KEYS_GEMINI[idx_current_key])
+else:
+    client_gemini = genai.Client()
 
 class GridNavigationProblem(Problem):
     def __init__(self, initial, goal, map_w, map_h, ostacoli):
@@ -62,6 +67,8 @@ class RoverAgent:
         return validi
 
     def _extract_goals_with_llm(self, text_message, coda_attuale):
+        global idx_current_key
+
         current_rover_pos = self.position 
         
         # ORA coda_attuale contiene ((x, y), 'Priorità'). Formattiamo la stringa di conseguenza:
@@ -90,9 +97,28 @@ class RoverAgent:
         Rispondi ESCLUSIVAMENTE con la lista completa ORDINATA (niente altro), una per riga nel formato esatto: 
         X, Y, Priorità
         """
-        response = self.client.models.generate_content(model=self.model_name, contents=prompt)
-        text_output = response.text.strip()
-        
+
+        max_tries = len(API_KEYS_GEMINI)
+
+        for tentativo in range(max_tries):
+            try:
+                # Proviamo a generare il contenuto
+                response = self.client.models.generate_content(model=self.model_name, contents=prompt)
+                text_output = response.text.strip()
+                break
+            except Exception as e:
+                error_msg = str(e).lower()
+                if "429" in error_msg or "quota" in error_msg or "exhausted" in error_msg:
+                    print(f"[SISTEMA] Chiave {idx_current_key + 1} esaurita. Rotazione in corso...")
+                    idx_current_key = (idx_current_key + 1) % len(API_KEYS_GEMINI)
+                    self.client = genai.Client(api_key=API_KEYS_GEMINI[idx_current_key])
+                    print(f"[SISTEMA] Passaggio alla chiave {idx_current_key + 1} completato. Nuovo tentativo...")
+                else:
+                    print(f"[SISTEMA] Errore critico API: {e}")
+                    return [] # O gestisci l'errore come preferisci
+
+
+
         extracted_goals = []
         for line in text_output.split('\n'):
             # Modifichiamo la Regex per prendere anche la priorità
