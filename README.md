@@ -5,12 +5,19 @@ Un ambiente di simulazione 3D sviluppato in Python con **Ursina Engine**, proget
 ## Caratteristiche Principali
 
 * **Generazione Mappa e Validazione:** Creazione interattiva di mappe a griglia con ostacoli e dispersi. Il sistema garantisce che la mappa sia sempre percorribile verificando la connettività delle celle vuote tramite ricerca BFS.
+
 * **Ricognizione Autonoma (Drone):** Il drone pattuglia l'area utilizzando l'algoritmo *Breadth-First Search* per l'esplorazione, individuando i feriti nel suo raggio visivo 3x3.
+
 * **Triage basato su Intelligenza Artificiale (LLM):** * Il drone analizza le condizioni mediche dei dispersi inviando le descrizioni a un modello LLM tramite **Groq** (`llama-3.1-8b-instant`), formulando un dispaccio radio con priorità mediche.
+
     * Il Rover processa i messaggi radio in linguaggio naturale tramite **OpenRouter / OpenAI** (`gpt-oss-120b:free` o Gemini), estraendo coordinate e priorità (Alta, Media, Bassa) per riordinare dinamicamente la coda di salvataggio.
+
 * **Navigazione Avanzata (Rover):** Il Rover calcola il percorso ottimale verso i bersagli schivando gli ostacoli grazie all'algoritmo **A*** (A-Star).
+
 * **Logistica Medevac:** Gestione realistica del carico. Il Rover ha una capienza massima di 3 passeggeri; una volta pieno (o in assenza di emergenze), calcola in automatico la rotta di ritorno verso l'Ospedale per lo sbarco dei feriti.
+
 * **Ambiente Dinamico e Temporizzato:** Ogni disperso possiede un *Time-To-Live* (TTL). Il tempo avanza globalmente e le vittime non soccorse in tempo deperiscono. Nuove emergenze (vittime nascoste) possono comparire dinamicamente durante le fasi avanzate della simulazione.
+
 * **Interfaccia Utente e Telemetria:** Console di sistema a scorrimento integrata per il monitoraggio in tempo reale dei log, dei dispacci radio e dei movimenti.
 
 ## Requisiti di Sistema
