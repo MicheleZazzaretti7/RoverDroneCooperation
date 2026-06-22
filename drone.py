@@ -52,10 +52,6 @@ def esegui_piano_volo_drone():
 
     controlla_visione_drone()
 
-    if len(state.vittime_scoperte) == len(state.dispersi):
-        state.log_messaggio("\n[DRONE] Tutti i dispersi sono stati individuati! Missione di ricognizione completata.\n Arresto del drone.")
-        return
-
     if not state.piano_volo_drone:
         goal_x = random.randint(0, state.map_w - 1)
         goal_y = random.randint(0, state.map_h - 1)
