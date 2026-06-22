@@ -8,12 +8,19 @@ from simulation import avanza_tempo_globale
 from dotenv import load_dotenv
 from google import genai
 from state import log_messaggio
+from openai import OpenAI
+import time
 
 mission_lock = threading.Lock()
 
 
 load_dotenv()
-API_KEYS_GEMINI = [os.getenv(f"GEMINI_API_KEY{i}") for i in range(1,4)]
+CHIAVE_OPENROUTER=os.getenv("OPENROUTER_API_KEY")
+client_openai = OpenAI(
+    base_url="https://openrouter.ai/api/v1",
+    api_key=CHIAVE_OPENROUTER,
+)
+API_KEYS_GEMINI = [os.getenv(f"GEMINI_API_KEY{i}") for i in range(1,6)]
 
 idx_current_key =0
 if API_KEYS_GEMINI:
@@ -52,12 +59,14 @@ class GridNavigationProblem(Problem):
 class RoverAgent:
     def __init__(self, initial_position):
         self.position = initial_position
-        self.client = client_gemini  
-        self.model_name = 'gemini-2.5-flash-lite' 
+        self.client = client_openai #client_gemini  
+        self.model_name = 'openai/gpt-oss-120b:free' #'gemini-2.5-flash-lite'
 
     def _filtra_coordinate_valide(self, lista_goal):
         """Scarta eventuali coordinate inventate dall'LLM che non corrispondono a vittime realmente scoperte."""
-        coordinate_reali = {(v.grid_x, v.grid_y) for v in state.vittime_scoperte}
+        coordinate_reali = {(v.grid_x, v.grid_y) for v in state.vittime_scoperte
+                            if not getattr(v, 'salvato', False) and not getattr(v, 'morto', False)
+        }
         validi = []
         for (x, y), priorita in lista_goal:
             if (x, y) in coordinate_reali:
@@ -96,33 +105,54 @@ class RoverAgent:
         Rispondi ESCLUSIVAMENTE con la lista completa ORDINATA (niente altro), una per riga nel formato esatto: 
         X, Y, Priorità
         """
+# procedimento commentato corrispondente a quello da applicare per gemini
+        #max_tries = len(API_KEYS_GEMINI)
+        #for tentativo in range(max_tries):
+        #    try:
+        #        # Proviamo a generare il contenuto
+        #        response = self.client.models.generate_content(model=self.model_name, contents=prompt)
+        #        text_output = response.text.strip()
+        #        break
+        #    except Exception as e:
+        #        error_msg = str(e).lower()
 
-        max_tries = len(API_KEYS_GEMINI)
+        #        if any(parola in error_msg for parola in ["429", "quota", "exhausted", "503", "unavailable", "demand"]):
+        #           print("[SISTEMA] Errore temporaneo API (Quota/Saturazione 503). Tentativo di recupero...")
+        #            idx_current_key = (idx_current_key + 1) % len(API_KEYS_GEMINI)
+        #            self.client = genai.Client(api_key=API_KEYS_GEMINI[idx_current_key])
+        #            print(f"[SISTEMA] Passaggio alla chiave {idx_current_key + 1} completato. Nuovo tentativo...")
+
+        #            time.sleep(1)
+        #        else:
+        #            print(f"[SISTEMA] Errore critico API: {e}")
+        #            return [] # O gestisci l'errore come preferisci
+                
+
+        #if not text_output:
+        #    print("[SISTEMA] Errore irreversibile: Tutti i tentativi radio sono falliti per saturazione dei server.")
+        #return[]
+
+        max_tries=3
+
+        text_output=""
 
         for tentativo in range(max_tries):
             try:
-                # Proviamo a generare il contenuto
-                response = self.client.models.generate_content(model=self.model_name, contents=prompt)
-                text_output = response.text.strip()
-                break
+                # Nuova sintassi stile OpenAI / OpenRouter
+                response = self.client.chat.completions.create(
+                    model=self.model_name,
+                    messages=[{"role": "user", "content": prompt}],
+                )
+                text_output = response.choices[0].message.content.strip()
+                break # Se va a buon fine, esce dal ciclo
             except Exception as e:
                 error_msg = str(e).lower()
-
-                if any(parola in error_msg for parola in ["429", "quota", "exhausted", "503", "unavailable", "demand"]):
-                    print("[SISTEMA] Errore temporaneo API (Quota/Saturazione 503). Tentativo di recupero...")
-                    idx_current_key = (idx_current_key + 1) % len(API_KEYS_GEMINI)
-                    self.client = genai.Client(api_key=API_KEYS_GEMINI[idx_current_key])
-                    print(f"[SISTEMA] Passaggio alla chiave {idx_current_key + 1} completato. Nuovo tentativo...")
-
-                    time.sleep(1)
-                else:
-                    print(f"[SISTEMA] Errore critico API: {e}")
-                    return [] # O gestisci l'errore come preferisci
-                
+                print(f"[SISTEMA] Errore API OpenRouter al tentativo {tentativo + 1}/{max_tries}: {error_msg}")
+                time.sleep(2) # Pausa fissa di 2 secondi prima di riprovare, senza cambiare chiave
 
         if not text_output:
-            print("[SISTEMA] Errore irreversibile: Tutti i tentativi radio sono falliti per saturazione dei server.")
-        return[]
+            print("[SISTEMA] Errore irreversibile: Tutti i tentativi radio sono falliti.")
+            return []
 
         extracted_goals = []
         for line in text_output.split('\n'):
@@ -169,9 +199,17 @@ def calcola_prossimo_percorso_rover():
         
     # 3. Nessun allarme e stiva vuota
     else:
-        state.rover_in_movimento = False
-        state.log_messaggio("[ROVER] Tutti gli obiettivi raggiunti. Passeggeri scesi. In attesa...")
-        return
+        ospedale = getattr(state, 'ospedale_posizione', (0,0))
+        if (state.rover.grid_x, state.rover.grid_y) != ospedale:
+            state.rover_in_movimento = True
+            state.in_viaggio_verso_ospedale = True
+            obiettivo_attuale = ospedale
+            state.obiettivo_corrente = obiettivo_attuale
+            state.log_messaggio(f"[ROVER] Nessuna emergenza attiva. Rientro alla base {ospedale}.")
+        else:
+            state.rover_in_movimento = False
+            state.log_messaggio("[ROVER] In attesa di ordini alla base...")
+            return
 
     # Calcolo A*
     ostacoli = set((c.grid_x, c.grid_y) for c in state.grid_cells if getattr(c, 'is_obstacle', False))

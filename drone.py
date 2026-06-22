@@ -107,6 +107,19 @@ def controlla_visione_drone():
                         state.vittime_attive.remove(disp)
                         continue 
                     
+                    if getattr(disp, 'morto', False):
+                        if not getattr(disp, 'notificato_morto', False):
+                            disp.color = color.black
+                            disp.text = "X"
+                            disp.text_color = color.red
+                            state.log_messaggio(f"\n[DRONE] Avvistato cadavere in ({check_x}, {check_y}). Troppo tardi.")
+                            disp.notificato_morto = True
+                            
+                            # Rimuoviamo proattivamente il cadavere dalla rotta del Rover!
+                            with rover.mission_lock:
+                                state.coda_obiettivi_rover = [ob for ob in state.coda_obiettivi_rover if ob[0] != (check_x, check_y)]
+                        continue # Salta il resto, è morta
+                    
                     # Salta se già scoperta (per evitare rielaborazione)
                     if getattr(disp, 'scoperto', False):
                         continue
@@ -116,17 +129,11 @@ def controlla_visione_drone():
                     state.vittime_scoperte.append(disp)
                     disp.scoperto = True
                     
-                    if getattr(disp, 'morto', False):
-                        disp.color = color.black
-                        disp.text = "X"
-                        disp.text_color = color.red
-                        state.log_messaggio(f"\n[DRONE] Avvistato cadavere in ({check_x}, {check_y}). Troppo tardi.")
-                    else:
-                        disp.color = color.magenta
-                        disp.text = str(disp.ttl) 
-                        disp.text_color = color.white
-                        state.log_messaggio(f"\n[DRONE] Avvistato soggetto VIVO in ({check_x}, {check_y})!")
-                        vittime_vive_trovate.append(disp)
+                    disp.color = color.magenta
+                    disp.text = str(disp.ttl) 
+                    disp.text_color = color.white
+                    state.log_messaggio(f"\n[DRONE] Avvistato soggetto VIVO in ({check_x}, {check_y})!")
+                    vittime_vive_trovate.append(disp)
 
     # Solo DOPO aver scandagliato l'intera visuale 3x3, valutiamo TUTTE le vittime vive trovate insieme in UN'UNICA CHIAMATA LLM
     if vittime_vive_trovate:
