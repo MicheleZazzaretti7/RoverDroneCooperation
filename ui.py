@@ -3,6 +3,7 @@ import state
 from map_manager import toggle_obstacle_disperso, is_connected
 import drone
 import rover
+IMAGES_PATH=("models/")
 
 def genera_mappa_vuota():
     try:
@@ -119,7 +120,7 @@ def mostra_ui_descrizione():
     
     state.input_ttl = InputField(
         default_value="30",
-        character_limit=2
+        character_limit=3
     )
     state.input_description.color = color.clear
 
@@ -233,7 +234,7 @@ def seleziona_posizione_agente_ospedale(cell):
         cell.is_ospedale = True
 
     cell.color = color.white
-    cell.texture="hospital.png"
+    cell.texture=f"{IMAGES_PATH}hospital.png"
     state.stato_posizionamento = None
     state.testo_istruzioni.text = "Deploy e posizionamento completato! Avvio simulazione"
     state.testo_istruzioni.color = color.green
@@ -255,7 +256,7 @@ def avvia_simulazione_3d():
             cell.text_entity.disable()
 
         cell.model = 'cube'
-        cell.texture = 'montagna.jpg'
+        cell.texture = f'{IMAGES_PATH}montagna.jpg'
         cell.scale_z = 0.2
         cell.z = 0
         Entity(parent=cell, model='cube', color=color.black, wireframe=True, scale=1.05)
@@ -264,7 +265,7 @@ def avvia_simulazione_3d():
             montagna = Entity(
                 parent=scene,
                 model=Cone(resolution=4),
-                texture='montagna.jpg',
+                texture=f'{IMAGES_PATH}montagna.jpg',
                 scale=(0.7, 1.3, 0.7),
                 position=(cell.x, cell.y, -0.50),
                 rotation=(-90,0,0)
@@ -272,16 +273,16 @@ def avvia_simulazione_3d():
             Entity(parent=montagna, model=Cone(resolution=4), color=color.black, wireframe=True, scale=1.05)
         elif getattr(cell, 'is_disperso', False):
             cell.color = color.hex('#7CFC00')
-            cell.texture = 'grass.jpg'
+            cell.texture = f'{IMAGES_PATH}grass.jpg'
             state.vittime_nascoste.append(cell)
         
         elif getattr(cell, 'is_ospedale', False):
             cell.color=color.white
-            cell.texture= 'hospital.png'
+            cell.texture= f'{IMAGES_PATH}hospital.png'
         
         else:
             cell.color = color.hex('#7CFC00')
-            cell.texture = 'grass.jpg'
+            cell.texture = f'{IMAGES_PATH}grass.jpg'
 
     camera.orthographic = False
     camera_editor =EditorCamera()
@@ -299,11 +300,12 @@ def avvia_simulazione_3d():
     real_rover_y = start_rover_y - offset_y
     
     # Istanziazione Agenti
-    state.drone = Entity(model='craft_speederA.obj', color=color.cyan, texture='metallo.jpg', scale=0.6, position=(real_drone_x, real_drone_y, -2.5), rotation=(-90, 0, 0))
+
+    state.drone = Entity(model=f'{IMAGES_PATH}craft_speederA.obj', color=color.cyan, texture=f'{IMAGES_PATH}metallo.jpg', scale=0.5, position=(real_drone_x, real_drone_y, -2.5), rotation=(-90, 0, 0))
     state.drone.grid_x = start_drone_x
     state.drone.grid_y = start_drone_y
     
-    state.rover = Entity(model='craft_miner.obj', color=color.orange, texture='metallo.jpg', scale=0.5, position=(real_rover_x, real_rover_y, -0.5), rotation=(-90, 0, 0))
+    state.rover = Entity(model=f'{IMAGES_PATH}craft_miner.obj', color=color.orange, texture=f'{IMAGES_PATH}metallo.jpg', scale=0.4, position=(real_rover_x, real_rover_y, -0.5), rotation=(-90, 0, 0))
     state.rover.grid_x = start_rover_x
     state.rover.grid_y = start_rover_y
 
@@ -409,6 +411,5 @@ def avvia_simulazione_3d():
     
     # Inviamo il primo messaggio!
     print("[SISTEMA] Avvio simulazione 3D...")
-
     invoke(drone.esegui_piano_volo_drone, delay=1.0)
 

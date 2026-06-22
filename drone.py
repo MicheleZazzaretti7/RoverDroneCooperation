@@ -1,5 +1,5 @@
 from ursina import *
-from aima import *
+from libs.aima import *
 import random
 import threading
 import os
@@ -46,6 +46,16 @@ class DroneExplorationProblem(Problem):
 def esegui_piano_volo_drone():
     if not state.drone: return
 
+    state.turni_trascorsi += 1
+    if state.turni_trascorsi == 1: spawna_vittime(2)
+    elif state.turni_trascorsi % 7 == 0: spawna_vittime(1)
+
+    controlla_visione_drone()
+
+    if len(state.vittime_scoperte) == len(state.dispersi):
+        state.log_messaggio("\n[DRONE] Tutti i dispersi sono stati individuati! Missione di ricognizione completata.\n Arresto del drone.")
+        return
+
     if not state.piano_volo_drone:
         goal_x = random.randint(0, state.map_w - 1)
         goal_y = random.randint(0, state.map_h - 1)
@@ -75,17 +85,11 @@ def esegui_piano_volo_drone():
         offset_x, offset_y = (state.map_w - 1) / 2, (state.map_h - 1) / 2
         state.drone.animate_position((nuovo_x - offset_x, nuovo_y - offset_y, -2.5), duration=0.3, curve=curve.linear)
 
-        state.turni_trascorsi += 1
-        if state.turni_trascorsi == 1: spawna_vittime(2)
-        elif state.turni_trascorsi % 7 == 0: spawna_vittime(1)
-
         if not state.rover_in_movimento:
             state.mosse_drone_parziali += 1
             if state.mosse_drone_parziali >= 6:
                 state.mosse_drone_parziali = 0
                 avanza_tempo_globale()
-
-        controlla_visione_drone()
 
     invoke(esegui_piano_volo_drone, delay=0.5)
 
@@ -141,7 +145,7 @@ def chiama_llm_triage(lista_vittime):
     print(f"\n[LLM] Connessione a Groq... Generazione dispaccio per {len(lista_vittime)} vittima/e.")
     
     prompt_drone = f"""
-        Sei un drone di ricognizione di un ambiente montano della protezione civile.
+    Sei un drone di ricognizione di un ambiente montano della protezione civile.
     Hai appena identificato {len(lista_vittime)} ferito/i nella tua visuale, alle seguenti coordinate e con le seguenti descrizioni:
     {descrizioni_str}
 
@@ -150,7 +154,7 @@ def chiama_llm_triage(lista_vittime):
     1. Includi SEMPRE le coordinate di OGNI vittima elencata.
     2. Valuta la gravità di CIASCUNA vittima singolarmente, in base alla sua descrizione.
     3. Indica per ognuna la priorità medica ("alta", "media" o "bassa") in base alla gravità valutata.
-    4. Se non esiste una descrizione, non inventare nulla.
+    4. Se non esiste una descrizione, NON INVENTARE NULLA.
     5. REGOLA D'ORO: Rispondi SOLO ed ESCLUSIVAMENTE con il testo del messaggio radio, una frase breve per vittima. NON aggiungere premesse, saluti o giustificazioni finali. Qualsiasi parola fuori dal messaggio radio farà fallire la missione.
     """
     

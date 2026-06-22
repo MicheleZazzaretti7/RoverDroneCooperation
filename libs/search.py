@@ -1,22 +1,3 @@
-import urllib.request
-import os
-from collections import deque
-
-# The AIMA files required for search.py
-aima_files = ['utils.py', 'utils4e.py']
-base_url = "https://raw.githubusercontent.com/aimacode/aima-python/master/"
-
-for file_name in aima_files:
-    if not os.path.exists(file_name):
-        print(f"Downloading {file_name}...")
-        urllib.request.urlretrieve(base_url + file_name, file_name)
-    else:
-        print(f"{file_name} already exists in your local folder.")
-
-# Now it is safe to import them
-from utils import *
-from utils4e import *
-
 """
 Search (Chapters 3-4)
 
@@ -24,6 +5,12 @@ The way to use this code is to subclass Problem to create a class of problems,
 then create problem instances and solve them with calls to the various search
 functions.
 """
+
+import sys
+from collections import deque
+
+from libs.utils import *
+
 
 class Problem:
     """The abstract class for a formal problem. You should subclass
@@ -75,6 +62,9 @@ class Problem:
         raise NotImplementedError
 
 
+# ______________________________________________________________________________
+
+
 class Node:
     """A node in a search tree. Contains a pointer to the parent (the node
     that this is a successor of) and to the actual state for this node. Note
@@ -99,11 +89,7 @@ class Node:
         return "<Node {}>".format(self.state)
 
     def __lt__(self, node):
-        if  type(node.state) is dict:
-            return self.state["robot"] < node.state["robot"]
-        else:
-            #otherwise is a tuple ( like Eight puzzle ) and we can easly check the greater.
-            return self.state < node.state
+        return self.state < node.state
 
     def expand(self, problem):
         """List the nodes reachable in one step from this node."""
@@ -142,7 +128,11 @@ class Node:
         # object itself to quickly search a node
         # with the same state in a Hash Table
         return hash(self.state)
-#_________________________________________________________________________________________________
+
+
+# ______________________________________________________________________________
+
+
 class SimpleProblemSolvingAgentProgram:
     """
     [Figure 3.1]
@@ -195,12 +185,10 @@ def breadth_first_tree_search(problem):
     """
 
     frontier = deque([Node(problem.initial)])  # FIFO queue
-    nodesCounter = 0
+
     while frontier:
         node = frontier.popleft()
-        nodesCounter += 1
         if problem.goal_test(node.state):
-            print("Examined: ",nodesCounter,"nodes")
             return node
         frontier.extend(node.expand(problem))
     return None
@@ -253,22 +241,17 @@ def breadth_first_graph_search(problem):
     single line as below:
     return graph_search(problem, FIFOQueue())
     """
-    conta = 0
     node = Node(problem.initial)
     if problem.goal_test(node.state):
         return node
     frontier = deque([node])
-    explored = list()
+    explored = set()
     while frontier:
         node = frontier.popleft()
-        conta = conta + 1
-        if node.state not in explored:
-            explored.append(node.state)
+        explored.add(node.state)
         for child in node.expand(problem):
             if child.state not in explored and child not in frontier:
                 if problem.goal_test(child.state):
-                    #print("Examined",conta,"nodes")
-                    #print(len(explored), "paths have been expanded and", len(frontier), "paths remain in the frontier")
                     return child
                 frontier.append(child)
     return None
@@ -282,23 +265,19 @@ def best_first_graph_search(problem, f, display=False):
     There is a subtlety: the line "f = memoize(f, 'f')" means that the f
     values will be cached on the nodes as they are computed. So after doing
     a best first search you can examine the f values of the path returned."""
-    conta = 0
     f = memoize(f, 'f')
     node = Node(problem.initial)
     frontier = PriorityQueue('min', f)
     frontier.append(node)
-    explored = list()
+    explored = set()
     while frontier:
         node = frontier.pop()
         if problem.goal_test(node.state):
             if display:
-                print("Examined",conta,"nodes")
                 print(len(explored), "paths have been expanded and", len(frontier), "paths remain in the frontier")
             return node
-        if node.state not in explored:
-            explored.append(node.state)
+        explored.add(node.state)
         for child in node.expand(problem):
-            conta = conta + 1
             if child.state not in explored and child not in frontier:
                 frontier.append(child)
             elif child in frontier:
@@ -307,77 +286,23 @@ def best_first_graph_search(problem, f, display=False):
                     frontier.append(child)
     return None
 
-def astar_search_2(problem, display=False):
-    """Search the nodes with the lowest f scores first.
-    You specify the function f(node) that you want to minimize; for example,
-    if f is a heuristic estimate to the goal, then we have greedy best
-    first search; if f is node.depth then we have breadth-first search.
-    There is a subtlety: the line "f = memoize(f, 'f')" means that the f
-    values will be cached on the nodes as they are computed. So after doing
-    a best first search you can examine the f values of the path returned."""
-
-    node = Node(problem.initial)
-    frontier = PriorityQueue('min', problem.astar_cost)
-    frontier.append(node)
-    while frontier:
-        node = frontier.pop()
-        #print(node)
-        if problem.goal_test(node.state):
-            if display:
-                print(len(frontier), " paths remain in the frontier")
-                print("Conta: ", conta, "Esaminati ", esaminati)
-            return node
-        for child in node.expand(problem):
-            conta = conta + 1
-            if child not in frontier:
-                frontier.append(child)
-            elif child in frontier:
-                if problem.astar_cost(child) < frontier[child]:
-                    del frontier[child]
-                    frontier.append(child)
-    return None
-
-def astar_search_test(problem, h=None, display=False):
-    esaminati=0
-    node= Node(problem.initial)
-    frontier= PriorityQueue('min', problem.astar_cost)
-    frontier.append(node)
-    while frontier:
-        node = frontier.pop()
-        esaminati = esaminati +1
-        if problem.goal_test(node.state):
-            if display:
-                #print(node)
-                #print(len(frontier), " path remain in the frontier")
-                print("Esaminati ",esaminati)
-            return node
-        successors = node.expand(problem)
-        conta = conta + len(successors)
-        for child in successors:
-            frontier.append(child)
-    return None
 
 def uniform_cost_search(problem, display=False):
     """[Figure 3.14]"""
     return best_first_graph_search(problem, lambda node: node.path_cost, display)
 
-node_count = 0
-def depth_limited_search(problem, limit=50, display=False):
-    global node_count
-    node_count = 0
+
+def depth_limited_search(problem, limit=50):
     """[Figure 3.17]"""
+
     def recursive_dls(node, problem, limit):
-        global node_count
         if problem.goal_test(node.state):
-            if display:
-                print("Examined ", node_count, "Nodes")
             return node
         elif limit == 0:
             return 'cutoff'
         else:
             cutoff_occurred = False
             for child in node.expand(problem):
-                node_count +=1
                 result = recursive_dls(child, problem, limit - 1)
                 if result == 'cutoff':
                     cutoff_occurred = True
@@ -389,10 +314,10 @@ def depth_limited_search(problem, limit=50, display=False):
     return recursive_dls(Node(problem.initial), problem, limit)
 
 
-def iterative_deepening_search(problem, display=False):
+def iterative_deepening_search(problem):
     """[Figure 3.18]"""
     for depth in range(sys.maxsize):
-        result = depth_limited_search(problem, depth, display)
+        result = depth_limited_search(problem, depth)
         if result != 'cutoff':
             return result
 
@@ -494,12 +419,13 @@ def astar_search(problem, h=None, display=False):
     h = memoize(h or problem.h, 'h')
     return best_first_graph_search(problem, lambda n: n.path_cost + h(n), display)
 
+
 # ______________________________________________________________________________
-# A* heuristics
+# A* heuristics 
 
 class EightPuzzle(Problem):
     """ The problem of sliding tiles numbered from 1 to 8 on a 3x3 board, where one of the
-    squares is a blank. A state is represented as a tuple of length 9, where element at
+    squares is a blank. A state is represented as a tuple of length 9, where  element at
     index i represents the tile number  at index i (0 if it's an empty square) """
 
     def __init__(self, initial, goal=(1, 2, 3, 4, 5, 6, 7, 8, 0)):
@@ -548,6 +474,7 @@ class EightPuzzle(Problem):
         """ Given a state, return True if state is a goal state or False, otherwise """
 
         return state == self.goal
+
     def check_solvability(self, state):
         """ Checks if the given state is solvable """
 
@@ -559,74 +486,12 @@ class EightPuzzle(Problem):
 
         return inversion % 2 == 0
 
-    def astar_cost(self,node):
-        return self.linear_h(node)+node.path_cost
-
-    def linear_h(self, node):
-        """ Return the heuristic value for a given state. Default heuristic function used is
+    def h(self, node):
+        """ Return the heuristic value for a given state. Default heuristic function used is 
         h(n) = number of misplaced tiles """
 
         return sum(s != g for (s, g) in zip(node.state, self.goal))
 
-    def linear(self, node):
-        return sum([1 if node.state[i] != self.goal[i] else 0 for i in range(8)])
-
-    def manhattan(self, node):
-        state = node.state
-
-        """1 2 3
-        4 5 6
-        7 8 0"""
-        index_goal = {0:[2,2], 1:[0,0], 2:[0,1], 3:[0,2], 4:[1,0], 5:[1,1], 6:[1,2], 7:[2,0], 8:[2,1]}
-        index_state = {}
-        index = [[0,0], [0,1], [0,2], [1,0], [1,1], [1,2], [2,0], [2,1], [2,2]]
-        x, y = 0, 0
-
-        """2 1 0
-        3 4 5
-        6 7 8"""
-        #es: se i = 0, e 2 si trova nella posizione 0, in index_state[2] finirà [0,0]
-        #3 avrà [1,0]
-        for i in range(len(state)):
-            index_state[state[i]] = index[i]
-
-        mhd = 0
-        """  x x x
-          8 x x
-          x x x
-
-          x x x
-          x x x
-          x 8 x"""
-        #index_state = {8:[1,0]}, goal : 8:[2,1]
-        for i in range(8):
-            for j in range(2):
-                mhd = abs(index_goal[i][j] - index_state[i][j]) + mhd
-
-        return mhd
-
-    def sqrt_manhattan(self,node):
-        state = node.state
-        index_goal = {0:[2,2], 1:[0,0], 2:[0,1], 3:[0,2], 4:[1,0], 5:[1,1], 6:[1,2], 7:[2,0], 8:[2,1]}
-        index_state = {}
-        index = [[0,0], [0,1], [0,2], [1,0], [1,1], [1,2], [2,0], [2,1], [2,2]]
-        x, y = 0, 0
-
-        for i in range(len(state)):
-            index_state[state[i]] = index[i]
-
-        mhd = 0
-
-        for i in range(8):
-            for j in range(2):
-                mhd = (index_goal[i][j] - index_state[i][j])**2 + mhd
-
-        return math.sqrt(mhd)
-
-    def max_heuristic(self,node):
-        score1 = self.manhattan(node)
-        score2 = self.linear_h(node)
-        return max(score1, score2)
 
 # ______________________________________________________________________________
 
@@ -808,7 +673,7 @@ def simulated_annealing(problem, schedule=exp_schedule()):
 
 
 def simulated_annealing_full(problem, schedule=exp_schedule()):
-    """ This version returns all the states encountered in reaching
+    """ This version returns all the states encountered in reaching 
     the goal state."""
     states = []
     current = Node(problem.initial)
@@ -988,6 +853,151 @@ class OnlineSearchProblem(Problem):
         return False
 
 
+class LRTAStarAgent:
+    """ [Figure 4.24]
+    Abstract class for LRTA*-Agent. A problem needs to be
+    provided which is an instance of a subclass of Problem Class.
+
+    Takes a OnlineSearchProblem [Figure 4.23] as a problem.
+    """
+
+    def __init__(self, problem):
+        self.problem = problem
+        # self.result = {}      # no need as we are using problem.result
+        self.H = {}
+        self.s = None
+        self.a = None
+
+    def __call__(self, s1):  # as of now s1 is a state rather than a percept
+        if self.problem.goal_test(s1):
+            self.a = None
+            return self.a
+        else:
+            if s1 not in self.H:
+                self.H[s1] = self.problem.h(s1)
+            if self.s is not None:
+                # self.result[(self.s, self.a)] = s1    # no need as we are using problem.output
+
+                # minimum cost for action b in problem.actions(s)
+                self.H[self.s] = min(self.LRTA_cost(self.s, b, self.problem.output(self.s, b),
+                                                    self.H) for b in self.problem.actions(self.s))
+
+            # an action b in problem.actions(s1) that minimizes costs
+            self.a = min(self.problem.actions(s1),
+                         key=lambda b: self.LRTA_cost(s1, b, self.problem.output(s1, b), self.H))
+
+            self.s = s1
+            return self.a
+
+    def LRTA_cost(self, s, a, s1, H):
+        """Returns cost to move from state 's' to state 's1' plus
+        estimated cost to get to goal from s1."""
+        print(s, a, s1)
+        if s1 is None:
+            return self.problem.h(s)
+        else:
+            # sometimes we need to get H[s1] which we haven't yet added to H
+            # to replace this try, except: we can initialize H with values from problem.h
+            try:
+                return self.problem.c(s, a, s1) + self.H[s1]
+            except:
+                return self.problem.c(s, a, s1) + self.problem.h(s1)
+
+
+# ______________________________________________________________________________
+# Genetic Algorithm
+
+
+def genetic_search(problem, ngen=1000, pmut=0.1, n=20):
+    """Call genetic_algorithm on the appropriate parts of a problem.
+    This requires the problem to have states that can mate and mutate,
+    plus a value method that scores states."""
+
+    # NOTE: This is not tested and might not work.
+    # TODO: Use this function to make Problems work with genetic_algorithm.
+
+    s = problem.initial_state
+    states = [problem.result(s, a) for a in problem.actions(s)]
+    random.shuffle(states)
+    return genetic_algorithm(states[:n], problem.value, ngen, pmut)
+
+
+def genetic_algorithm(population, fitness_fn, gene_pool=[0, 1], f_thres=None, ngen=1000, pmut=0.1):
+    """[Figure 4.8]"""
+    for i in range(ngen):
+        population = [mutate(recombine(*select(2, population, fitness_fn)), gene_pool, pmut)
+                      for i in range(len(population))]
+
+        fittest_individual = fitness_threshold(fitness_fn, f_thres, population)
+        if fittest_individual:
+            return fittest_individual
+
+    return max(population, key=fitness_fn)
+
+
+def fitness_threshold(fitness_fn, f_thres, population):
+    if not f_thres:
+        return None
+
+    fittest_individual = max(population, key=fitness_fn)
+    if fitness_fn(fittest_individual) >= f_thres:
+        return fittest_individual
+
+    return None
+
+
+def init_population(pop_number, gene_pool, state_length):
+    """Initializes population for genetic algorithm
+    pop_number  :  Number of individuals in population
+    gene_pool   :  List of possible values for individuals
+    state_length:  The length of each individual"""
+    g = len(gene_pool)
+    population = []
+    for i in range(pop_number):
+        new_individual = [gene_pool[random.randrange(0, g)] for j in range(state_length)]
+        population.append(new_individual)
+
+    return population
+
+
+def select(r, population, fitness_fn):
+    fitnesses = map(fitness_fn, population)
+    sampler = weighted_sampler(population, fitnesses)
+    return [sampler() for i in range(r)]
+
+
+def recombine(x, y):
+    n = len(x)
+    c = random.randrange(0, n)
+    return x[:c] + y[c:]
+
+
+def recombine_uniform(x, y):
+    n = len(x)
+    result = [0] * n
+    indexes = random.sample(range(n), n)
+    for i in range(n):
+        ix = indexes[i]
+        result[ix] = x[ix] if i < n / 2 else y[ix]
+
+    return ''.join(str(r) for r in result)
+
+
+def mutate(x, gene_pool, pmut):
+    if random.uniform(0, 1) >= pmut:
+        return x
+
+    n = len(x)
+    g = len(gene_pool)
+    c = random.randrange(0, n)
+    r = random.randrange(0, g)
+
+    new_gene = gene_pool[r]
+    return x[:c] + [new_gene] + x[c + 1:]
+
+
+# _____________________________________________________________________________
+# The remainder of this file implements examples for the search algorithms.
 
 # ______________________________________________________________________________
 # Graphs and Graph Problems
@@ -1284,13 +1294,222 @@ class NQueensProblem(Problem):
         return num_conflicts
 
 
+# ______________________________________________________________________________
+# Inverse Boggle: Search for a high-scoring Boggle board. A good domain for
+# iterative-repair and related search techniques, as suggested by Justin Boyan.
 
 
+ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+
+cubes16 = ['FORIXB', 'MOQABJ', 'GURILW', 'SETUPL',
+           'CMPDAE', 'ACITAO', 'SLCRAE', 'ROMASH',
+           'NODESW', 'HEFIYE', 'ONUDTK', 'TEVIGN',
+           'ANEDVZ', 'PINESH', 'ABILYT', 'GKYLEU']
+
+
+def random_boggle(n=4):
+    """Return a random Boggle board of size n x n.
+    We represent a board as a linear list of letters."""
+    cubes = [cubes16[i % 16] for i in range(n * n)]
+    random.shuffle(cubes)
+    return list(map(random.choice, cubes))
+
+
+# The best 5x5 board found by Boyan, with our word list this board scores
+# 2274 words, for a score of 9837
+
+
+boyan_best = list('RSTCSDEIAEGNLRPEATESMSSID')
+
+
+def print_boggle(board):
+    """Print the board in a 2-d array."""
+    n2 = len(board)
+    n = exact_sqrt(n2)
+    for i in range(n2):
+
+        if i % n == 0 and i > 0:
+            print()
+        if board[i] == 'Q':
+            print('Qu', end=' ')
+        else:
+            print(str(board[i]) + ' ', end=' ')
+    print()
+
+
+def boggle_neighbors(n2, cache={}):
+    """Return a list of lists, where the i-th element is the list of indexes
+    for the neighbors of square i."""
+    if cache.get(n2):
+        return cache.get(n2)
+    n = exact_sqrt(n2)
+    neighbors = [None] * n2
+    for i in range(n2):
+        neighbors[i] = []
+        on_top = i < n
+        on_bottom = i >= n2 - n
+        on_left = i % n == 0
+        on_right = (i + 1) % n == 0
+        if not on_top:
+            neighbors[i].append(i - n)
+            if not on_left:
+                neighbors[i].append(i - n - 1)
+            if not on_right:
+                neighbors[i].append(i - n + 1)
+        if not on_bottom:
+            neighbors[i].append(i + n)
+            if not on_left:
+                neighbors[i].append(i + n - 1)
+            if not on_right:
+                neighbors[i].append(i + n + 1)
+        if not on_left:
+            neighbors[i].append(i - 1)
+        if not on_right:
+            neighbors[i].append(i + 1)
+    cache[n2] = neighbors
+    return neighbors
+
+
+def exact_sqrt(n2):
+    """If n2 is a perfect square, return its square root, else raise error."""
+    n = int(np.sqrt(n2))
+    assert n * n == n2
+    return n
 
 
 # _____________________________________________________________________________
 
 
+class Wordlist:
+    """This class holds a list of words. You can use (word in wordlist)
+    to check if a word is in the list, or wordlist.lookup(prefix)
+    to see if prefix starts any of the words in the list."""
+
+    def __init__(self, file, min_len=3):
+        lines = file.read().upper().split()
+        self.words = [word for word in lines if len(word) >= min_len]
+        self.words.sort()
+        self.bounds = {}
+        for c in ALPHABET:
+            c2 = chr(ord(c) + 1)
+            self.bounds[c] = (bisect.bisect(self.words, c),
+                              bisect.bisect(self.words, c2))
+
+    def lookup(self, prefix, lo=0, hi=None):
+        """See if prefix is in dictionary, as a full word or as a prefix.
+        Return two values: the first is the lowest i such that
+        words[i].startswith(prefix), or is None; the second is
+        True iff prefix itself is in the Wordlist."""
+        words = self.words
+        if hi is None:
+            hi = len(words)
+        i = bisect.bisect_left(words, prefix, lo, hi)
+        if i < len(words) and words[i].startswith(prefix):
+            return i, (words[i] == prefix)
+        else:
+            return None, False
+
+    def __contains__(self, word):
+        return self.lookup(word)[1]
+
+    def __len__(self):
+        return len(self.words)
+
+
+# _____________________________________________________________________________
+
+
+class BoggleFinder:
+    """A class that allows you to find all the words in a Boggle board."""
+
+    wordlist = None  # A class variable, holding a wordlist
+
+    def __init__(self, board=None):
+        if BoggleFinder.wordlist is None:
+            BoggleFinder.wordlist = Wordlist(open_data("EN-text/wordlist.txt"))
+        self.found = {}
+        if board:
+            self.set_board(board)
+
+    def set_board(self, board=None):
+        """Set the board, and find all the words in it."""
+        if board is None:
+            board = random_boggle()
+        self.board = board
+        self.neighbors = boggle_neighbors(len(board))
+        self.found = {}
+        for i in range(len(board)):
+            lo, hi = self.wordlist.bounds[board[i]]
+            self.find(lo, hi, i, [], '')
+        return self
+
+    def find(self, lo, hi, i, visited, prefix):
+        """Looking in square i, find the words that continue the prefix,
+        considering the entries in self.wordlist.words[lo:hi], and not
+        revisiting the squares in visited."""
+        if i in visited:
+            return
+        wordpos, is_word = self.wordlist.lookup(prefix, lo, hi)
+        if wordpos is not None:
+            if is_word:
+                self.found[prefix] = True
+            visited.append(i)
+            c = self.board[i]
+            if c == 'Q':
+                c = 'QU'
+            prefix += c
+            for j in self.neighbors[i]:
+                self.find(wordpos, hi, j, visited, prefix)
+            visited.pop()
+
+    def words(self):
+        """The words found."""
+        return list(self.found.keys())
+
+    scores = [0, 0, 0, 0, 1, 2, 3, 5] + [11] * 100
+
+    def score(self):
+        """The total score for the words found, according to the rules."""
+        return sum([self.scores[len(w)] for w in self.words()])
+
+    def __len__(self):
+        """The number of words found."""
+        return len(self.found)
+
+
+# _____________________________________________________________________________
+
+
+def boggle_hill_climbing(board=None, ntimes=100, verbose=True):
+    """Solve inverse Boggle by hill-climbing: find a high-scoring board by
+    starting with a random one and changing it."""
+    finder = BoggleFinder()
+    if board is None:
+        board = random_boggle()
+    best = len(finder.set_board(board))
+    for _ in range(ntimes):
+        i, oldc = mutate_boggle(board)
+        new = len(finder.set_board(board))
+        if new > best:
+            best = new
+            if verbose:
+                print(best, _, board)
+        else:
+            board[i] = oldc  # Change back
+    if verbose:
+        print_boggle(board)
+    return board, best
+
+
+def mutate_boggle(board):
+    i = random.randrange(len(board))
+    oldc = board[i]
+    # random.choice(boyan_best)
+    board[i] = random.choice(random.choice(cubes16))
+    return i, oldc
+
+
+# ______________________________________________________________________________
 
 # Code to compare searchers on various problems.
 
@@ -1355,3 +1574,4 @@ def compare_graph_searchers():
                                 GraphProblem('Q', 'WA', australia_map)],
                       header=['Searcher', 'romania_map(Arad, Bucharest)',
                               'romania_map(Oradea, Neamt)', 'australia_map'])
+ 
