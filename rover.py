@@ -122,7 +122,7 @@ class RoverAgent:
 
         if not text_output:
             print("[SISTEMA] Errore irreversibile: Tutti i tentativi radio sono falliti per saturazione dei server.")
-        return[]
+            return[]
 
         extracted_goals = []
         for line in text_output.split('\n'):
