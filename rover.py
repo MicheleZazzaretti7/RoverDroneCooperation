@@ -13,7 +13,9 @@ mission_lock = threading.Lock()
 
 
 load_dotenv()
-API_KEYS_GEMINI = [os.getenv(f"GEMINI_API_KEY{i}") for i in range(1,4)]
+API_KEYS_GEMINI = [os.getenv(f"GEMINI_API_KEY{i}") for i in range(1,6)]
+
+text_output = ""
 
 idx_current_key =0
 if API_KEYS_GEMINI:
@@ -117,7 +119,7 @@ class RoverAgent:
                     time.sleep(1)
                 else:
                     print(f"[SISTEMA] Errore critico API: {e}")
-                    return [] # O gestisci l'errore come preferisci
+                    return [] 
                 
 
         if not text_output:
