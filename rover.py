@@ -1,5 +1,5 @@
 from ursina import *
-from aima import *
+from libs.aima import *
 import re
 import os
 import state

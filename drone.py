@@ -1,5 +1,5 @@
 from ursina import *
-from aima import *
+from libs.aima import *
 import random
 import threading
 import os
