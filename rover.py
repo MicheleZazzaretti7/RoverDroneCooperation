@@ -82,16 +82,15 @@ class RoverAgent:
         Hai appena ricevuto questo nuovo dispaccio radio: "{text_message}"
         
         IL TUO COMPITO (OBBLIGATORIO):
-        1. Estrai le nuove coordinate dal dispaccio radio e la priorità medica di OGNI vittima menzionata.
-        2. Unisci tutte le vittime (quelle attuali + quelle nuove appena ricevute).
-        3. ORDINA TUTTE le vittime per priorità medica DECRESCENTE:
+        1. Estrai le nuove coordinate dal dispaccio radio:"{text_message}" e la priorità medica di OGNI vittima menzionata.
+        2. ORDINA TUTTE le vittime per priorità medica DECRESCENTE:
            - PRIMA: Alta (massima urgenza)
            - DOPO: Media
            - ULTIMO: Bassa (minima urgenza)
+        3. Unisci tutte le vittime: degli obiettivi in attesa ({coda_str}) e quelli del dispaccio radio ({text_message}).
         4. A PARITÀ di priorità, ordina per distanza dal Rover (più vicina per prima).
         
         SCALA DI PRIORITÀ OBBLIGATORIA: Alta > Media > Bassa
-        ORDINAMENTO OBBLIGATORIO: Alta viene SEMPRE prima di Media, Media viene SEMPRE prima di Bassa
         
         RISPOSTA TASSATIVA - NON AGGIUNGERE NULLA:
         Rispondi ESCLUSIVAMENTE con la lista completa ORDINATA (niente altro), una per riga nel formato esatto: 

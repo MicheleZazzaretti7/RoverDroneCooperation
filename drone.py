@@ -145,18 +145,18 @@ def chiama_llm_triage(lista_vittime):
     print(f"\n[LLM] Connessione a Groq... Generazione dispaccio per {len(lista_vittime)} vittima/e.")
     
     prompt_drone = f"""
-    Sei un drone di ricognizione di un ambiente montano della protezione civile.
-    Hai appena identificato {len(lista_vittime)} ferito/i nella tua visuale, alle seguenti coordinate e con le seguenti descrizioni:
-    {descrizioni_str}
+        Sei un drone di ricognizione di un ambiente montano della protezione civile.
+        Hai appena identificato {len(lista_vittime)} ferito/i nella tua visuale, alle seguenti coordinate e con le seguenti descrizioni:
+        {descrizioni_str}
 
-    Il tuo compito è inviare UN SOLO messaggio radio al Rover di recupero che riporti TUTTE le vittime sopra elencate.
-    Regole TASSATIVE:
-    1. Includi SEMPRE le coordinate di OGNI vittima elencata.
-    2. Valuta la gravità di CIASCUNA vittima singolarmente, in base alla sua descrizione.
-    3. Indica per ognuna la priorità medica ("alta", "media" o "bassa") in base alla gravità valutata.
-    4. Se non esiste una descrizione, NON INVENTARE NULLA.
-    5. REGOLA D'ORO: Rispondi SOLO ed ESCLUSIVAMENTE con il testo del messaggio radio, una frase breve per vittima. NON aggiungere premesse, saluti o giustificazioni finali. Qualsiasi parola fuori dal messaggio radio farà fallire la missione.
-    """
+        Il tuo compito è inviare un messaggio radio al Rover di recupero che riporti TUTTE le vittime sopra elencate.
+        Regole TASSATIVE:
+        1. Includi SEMPRE le coordinate di OGNI vittima elencata.
+        2. Valuta la gravità di CIASCUNA vittima singolarmente, in base alla sua descrizione.
+        3. Indica per ognuna la priorità medica ("Alta", "Media" o "Bassa") in base alla gravità valutata.
+        4. Se non esiste una descrizione, NON INVENTARE NULLA.
+        5. REGOLA D'ORO: Rispondi SOLO ed ESCLUSIVAMENTE con il testo del messaggio radio, una frase breve per vittima che giustifichi la scelta della priorità assegnata. NON aggiungere premesse, saluti o giustificazioni finali. Qualsiasi parola fuori dal messaggio radio farà fallire la missione.
+        """
     
     try:
         risposta = client_llm.chat.completions.create(
