@@ -82,16 +82,15 @@ class RoverAgent:
         Hai appena ricevuto questo nuovo dispaccio radio: "{text_message}"
         
         IL TUO COMPITO (OBBLIGATORIO):
-        1. Estrai le nuove coordinate dal dispaccio radio e la priorità medica di OGNI vittima menzionata.
-        2. Unisci tutte le vittime (quelle attuali + quelle nuove appena ricevute).
-        3. ORDINA TUTTE le vittime per priorità medica DECRESCENTE:
+        1. Estrai le nuove coordinate dal dispaccio radio:"{text_message}" e la priorità medica di OGNI vittima menzionata.
+        2. ORDINA TUTTE le vittime per priorità medica DECRESCENTE:
            - PRIMA: Alta (massima urgenza)
            - DOPO: Media
            - ULTIMO: Bassa (minima urgenza)
+        3. Unisci tutte le vittime: degli obiettivi in attesa ({coda_str}) e quelli del dispaccio radio ({text_message}).
         4. A PARITÀ di priorità, ordina per distanza dal Rover (più vicina per prima).
         
         SCALA DI PRIORITÀ OBBLIGATORIA: Alta > Media > Bassa
-        ORDINAMENTO OBBLIGATORIO: Alta viene SEMPRE prima di Media, Media viene SEMPRE prima di Bassa
         
         RISPOSTA TASSATIVA - NON AGGIUNGERE NULLA:
         Rispondi ESCLUSIVAMENTE con la lista completa ORDINATA (niente altro), una per riga nel formato esatto: 
@@ -108,16 +107,22 @@ class RoverAgent:
                 break
             except Exception as e:
                 error_msg = str(e).lower()
-                if "429" in error_msg or "quota" in error_msg or "exhausted" in error_msg:
-                    print(f"[SISTEMA] Chiave {idx_current_key + 1} esaurita. Rotazione in corso...")
+
+                if any(parola in error_msg for parola in ["429", "quota", "exhausted", "503", "unavailable", "demand"]):
+                    print("[SISTEMA] Errore temporaneo API (Quota/Saturazione 503). Tentativo di recupero...")
                     idx_current_key = (idx_current_key + 1) % len(API_KEYS_GEMINI)
                     self.client = genai.Client(api_key=API_KEYS_GEMINI[idx_current_key])
                     print(f"[SISTEMA] Passaggio alla chiave {idx_current_key + 1} completato. Nuovo tentativo...")
+
+                    time.sleep(1)
                 else:
                     print(f"[SISTEMA] Errore critico API: {e}")
                     return [] # O gestisci l'errore come preferisci
+                
 
-
+        if not text_output:
+            print("[SISTEMA] Errore irreversibile: Tutti i tentativi radio sono falliti per saturazione dei server.")
+        return[]
 
         extracted_goals = []
         for line in text_output.split('\n'):
