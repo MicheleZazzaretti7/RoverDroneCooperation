@@ -3,14 +3,23 @@ from aima import *
 import re
 import os
 import state
+import threading
 from simulation import avanza_tempo_globale
 from dotenv import load_dotenv
 from google import genai
 from state import log_messaggio
 
+mission_lock = threading.Lock()
+
+
 load_dotenv()
-API_KEY_GEMINI = os.getenv("GEMINI_API_KEY4")
-client_gemini = genai.Client(api_key=API_KEY_GEMINI) if API_KEY_GEMINI else genai.Client()
+API_KEYS_GEMINI = [os.getenv(f"GEMINI_API_KEY{i}") for i in range(1,4)]
+
+idx_current_key =0
+if API_KEYS_GEMINI:
+    client_gemini = genai.Client(api_key=API_KEYS_GEMINI[idx_current_key])
+else:
+    client_gemini = genai.Client()
 
 class GridNavigationProblem(Problem):
     def __init__(self, initial, goal, map_w, map_h, ostacoli):
@@ -46,7 +55,20 @@ class RoverAgent:
         self.client = client_gemini  
         self.model_name = 'gemini-2.5-flash-lite' 
 
+    def _filtra_coordinate_valide(self, lista_goal):
+        """Scarta eventuali coordinate inventate dall'LLM che non corrispondono a vittime realmente scoperte."""
+        coordinate_reali = {(v.grid_x, v.grid_y) for v in state.vittime_scoperte}
+        validi = []
+        for (x, y), priorita in lista_goal:
+            if (x, y) in coordinate_reali:
+                validi.append(((x, y), priorita))
+            else:
+                print(f"[ROVER - SCARTO] Coordinate ({x},{y}) non corrispondono a nessuna vittima nota: scartate.")
+        return validi
+
     def _extract_goals_with_llm(self, text_message, coda_attuale):
+        global idx_current_key
+
         current_rover_pos = self.position 
         
         # ORA coda_attuale contiene ((x, y), 'Priorità'). Formattiamo la stringa di conseguenza:
@@ -75,9 +97,28 @@ class RoverAgent:
         Rispondi ESCLUSIVAMENTE con la lista completa ORDINATA (niente altro), una per riga nel formato esatto: 
         X, Y, Priorità
         """
-        response = self.client.models.generate_content(model=self.model_name, contents=prompt)
-        text_output = response.text.strip()
-        
+
+        max_tries = len(API_KEYS_GEMINI)
+
+        for tentativo in range(max_tries):
+            try:
+                # Proviamo a generare il contenuto
+                response = self.client.models.generate_content(model=self.model_name, contents=prompt)
+                text_output = response.text.strip()
+                break
+            except Exception as e:
+                error_msg = str(e).lower()
+                if "429" in error_msg or "quota" in error_msg or "exhausted" in error_msg:
+                    print(f"[SISTEMA] Chiave {idx_current_key + 1} esaurita. Rotazione in corso...")
+                    idx_current_key = (idx_current_key + 1) % len(API_KEYS_GEMINI)
+                    self.client = genai.Client(api_key=API_KEYS_GEMINI[idx_current_key])
+                    print(f"[SISTEMA] Passaggio alla chiave {idx_current_key + 1} completato. Nuovo tentativo...")
+                else:
+                    print(f"[SISTEMA] Errore critico API: {e}")
+                    return [] # O gestisci l'errore come preferisci
+
+
+
         extracted_goals = []
         for line in text_output.split('\n'):
             # Modifichiamo la Regex per prendere anche la priorità
@@ -88,6 +129,7 @@ class RoverAgent:
                 priorita = match.group(3).capitalize()
                 extracted_goals.append(((x, y), priorita))
                 
+        extracted_goals = self._filtra_coordinate_valide(extracted_goals)
         return extracted_goals
     
     def receive_and_execute_mission(self, drone_message):
@@ -107,7 +149,7 @@ def calcola_prossimo_percorso_rover():
         state.in_viaggio_verso_ospedale = True
         obiettivo_attuale = getattr(state, 'ospedale_posizione', (0,0))
         state.obiettivo_corrente = obiettivo_attuale
-        state.log_messaggio(f"[ROVER] Ritorno alla base! Direzione OSPEDALE {obiettivo_attuale} con {len(state.passeggeri_rover)} feriti a bordo.")
+        state.log_messaggio(f"[ROVER - MEDEVAC] Ritorno alla base! Direzione OSPEDALE {obiettivo_attuale} con {len(state.passeggeri_rover)} feriti a bordo.")
         
     # 2. Valutazione soccorso: ho allarmi in coda e spazio a bordo
     elif state.coda_obiettivi_rover:

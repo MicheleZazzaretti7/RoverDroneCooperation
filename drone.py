@@ -57,7 +57,7 @@ def esegui_piano_volo_drone():
             nodo_soluzione = breadth_first_graph_search(problema_drone)
             if nodo_soluzione:
                 state.piano_volo_drone = nodo_soluzione.solution() 
-                print(f"[NAVIGAZIONE] Nuovo Waypoint: {obiettivo}. Rotta: {state.piano_volo_drone}")
+                #print(f"[NAVIGAZIONE] Nuovo Waypoint: {obiettivo}. Rotta: {state.piano_volo_drone}")
 
     if state.piano_volo_drone:
         prossima_mossa = state.piano_volo_drone.pop(0)
@@ -97,7 +97,7 @@ def controlla_visione_drone():
             check_x = state.drone.grid_x + dx
             check_y = state.drone.grid_y + dy
             
-            for disp in state.vittime_attive[:]: 
+            for disp in state.vittime_attive[:]:
                 # ESCLUSIONE: salta le vittime ancora nascoste (non spawned)
                 if disp in state.vittime_nascoste:
                     continue
@@ -141,7 +141,7 @@ def chiama_llm_triage(lista_vittime):
     print(f"\n[LLM] Connessione a Groq... Generazione dispaccio per {len(lista_vittime)} vittima/e.")
     
     prompt_drone = f"""
-    Sei un drone di ricognizione di un ambiente montano della protezione civile.
+        Sei un drone di ricognizione di un ambiente montano della protezione civile.
     Hai appena identificato {len(lista_vittime)} ferito/i nella tua visuale, alle seguenti coordinate e con le seguenti descrizioni:
     {descrizioni_str}
 
@@ -150,9 +150,10 @@ def chiama_llm_triage(lista_vittime):
     1. Includi SEMPRE le coordinate di OGNI vittima elencata.
     2. Valuta la gravità di CIASCUNA vittima singolarmente, in base alla sua descrizione.
     3. Indica per ognuna la priorità medica ("alta", "media" o "bassa") in base alla gravità valutata.
-    4. REGOLA D'ORO: Rispondi SOLO ed ESCLUSIVAMENTE con il testo del messaggio radio, una frase breve per vittima. NON aggiungere premesse, saluti o giustificazioni finali. Qualsiasi parola fuori dal messaggio radio farà fallire la missione.
+    4. Se non esiste una descrizione, non inventare nulla.
+    5. REGOLA D'ORO: Rispondi SOLO ed ESCLUSIVAMENTE con il testo del messaggio radio, una frase breve per vittima. NON aggiungere premesse, saluti o giustificazioni finali. Qualsiasi parola fuori dal messaggio radio farà fallire la missione.
     """
-
+    
     try:
         risposta = client_llm.chat.completions.create(
             messages=[{"role": "user", "content": prompt_drone}],
@@ -161,16 +162,21 @@ def chiama_llm_triage(lista_vittime):
         messaggio_radio = risposta.choices[0].message.content.strip()
         coordinate_str = ", ".join(f"({v.grid_x},{v.grid_y})" for v in lista_vittime)
         state.log_messaggio(f"\n [DISPACCIO DRONE-TO-ROVER] Avvistamento {coordinate_str}:\n«{messaggio_radio}»")
-
+              
         if state.rover_agent_instance:
-            nuova_coda_completa = state.rover_agent_instance.receive_and_execute_mission(messaggio_radio)
-
-            if nuova_coda_completa:
-                state.coda_obiettivi_rover = nuova_coda_completa
-                state.log_messaggio(f"[SISTEMA] Nuova rotta operativa: {state.coda_obiettivi_rover}")
-
-                if not state.rover_in_movimento and state.coda_obiettivi_rover:
-                    rover.calcola_prossimo_percorso_rover()
+            with rover.mission_lock:
+            # L'LLM ora restituisce la lista MASTER già completa e ordinata
+                nuova_coda_completa = state.rover_agent_instance.receive_and_execute_mission(messaggio_radio)
+                
+                if nuova_coda_completa:
+                    # Sovrascriviamo in blocco la coda in Python
+                    state.coda_obiettivi_rover = nuova_coda_completa
+                            
+                    state.log_messaggio(f"[SISTEMA] Nuova rotta operativa: {state.coda_obiettivi_rover}")
+                    
+                    # Se il rover era fermo, lo facciamo partire
+                    if not state.rover_in_movimento and state.coda_obiettivi_rover:
+                        rover.calcola_prossimo_percorso_rover()
 
     except Exception as e:
         print(f"[ERRORE RADIO] Comunicazione fallita: {e}")
