@@ -290,6 +290,30 @@ def avvia_simulazione_3d():
     
     offset_x = (state.map_w - 1) / 2
     offset_y = (state.map_h - 1) / 2
+
+    for x in range(state.map_w):
+        real_x = x -offset_x
+        real_y_bottom = -0.7 -offset_y
+        Text(
+            text=str(x),
+            position=(real_x, real_y_bottom, -0.5),
+            scale=15,
+            color=color.black,
+            origin=(0,0),
+            parent=scene
+        )
+    
+    for y in range(state.map_h):
+        real_y = y -offset_y
+        real_x_left = -0.7-offset_x
+        Text(
+            text=str(y),
+            position=(real_x_left, real_y, -0.5),
+            scale=15,
+            color=color.black,
+            origin=(0,0),
+            parent=scene
+        )
     
     start_drone_x, start_drone_y = state.start_drone_pos
     start_rover_x, start_rover_y = state.start_rover_pos
