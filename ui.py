@@ -69,6 +69,8 @@ def conferma_mappa():
         if getattr(cell, 'is_obstacle', False):
             mappa_logica[cell.grid_x][cell.grid_y] = 1
 
+
+    # TEST PER VERIFICARE CHE IL DRONE VEDA ANCHE NEL CASO IN CUI SIA IRRAGGIUNGIBILE
     if not is_connected(mappa_logica, state.map_w, state.map_h):
         state.error_text = Text(
             text="ERRORE: La mappa contiene aree inaccessibili!\nRimuovi alcuni ostacoli e riprova.",

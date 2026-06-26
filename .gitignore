@@ -1,4 +1,6 @@
 .env
 .venv
+.pdf
+
 __pycache__
 models_compressed

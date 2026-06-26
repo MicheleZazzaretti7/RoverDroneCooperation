@@ -170,7 +170,7 @@ class RoverAgent:
     def receive_and_execute_mission(self, drone_message):
         state.log_messaggio(f"\n[ROVER - RADIO] Ricevuto dispaccio:\n{drone_message}")
         
-        # Passiamo a Gemini anche la coda di salvataggio attuale dello stato
+        # Passiamo a Gemini o gpt anche la coda di salvataggio attuale dello stato
         nuova_coda_ordinata = self._extract_goals_with_llm(drone_message, state.coda_obiettivi_rover)
         
         state.log_messaggio(f"[ROVER - TATTICA LLM] Nuova coda riordinata: {nuova_coda_ordinata}")
